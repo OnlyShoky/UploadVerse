@@ -23,8 +23,14 @@ class InstagramUploader(BasePlatform):
         super().__init__(config)
         self.username = self.config.get('username', '')
         self.password = self.config.get('password', '')
-        self.cookies_file = self.config.get('cookies_file', 'instagram_cookies.pkl')
+        self.cookies_file = self.config.get('cookies_file', 'data/sessions/instagram_session.pkl')
         self.headless = self.config.get('headless', False)
+        
+        # Ensure sessions directory exists
+        cookie_path = Path(self.cookies_file)
+        if not cookie_path.parent.exists():
+            cookie_path.parent.mkdir(parents=True, exist_ok=True)
+        
         self.driver = None
         
     def _init_driver(self):

@@ -23,7 +23,13 @@ class YouTubeUploader(BasePlatform):
     def __init__(self, config: Optional[dict] = None):
         super().__init__(config)
         self.credentials_file = self.config.get('credentials_file', 'client_secrets.json')
-        self.token_file = self.config.get('token_file', 'youtube_token.pickle')
+        self.token_file = self.config.get('token_file', 'data/sessions/youtube_token.pickle')
+        
+        # Ensure sessions directory exists
+        token_path = Path(self.token_file)
+        if not token_path.parent.exists():
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+        
         self.creds: Optional[Credentials] = None
         self.youtube = None
         

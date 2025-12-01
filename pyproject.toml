@@ -28,6 +28,7 @@ dependencies = [
     "opencv-python",
     "click",
     "typer",
+    "rich",
     "python-dotenv",
     "pydantic"
 ]

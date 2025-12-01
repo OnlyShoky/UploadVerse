@@ -39,25 +39,6 @@ env/
 *.swo
 *~
 .DS_Store
-
-# Pytest
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Authentication & Secrets
-client_secrets.json
-youtube_token.pickle
-tiktok_cookies.pkl
-instagram_cookies.pkl
-*.pkl
-*.pickle
-
-# Logs
-*.log
-
-# OS
-Thumbs.db
 .DS_Store
 
 # Chrome Driver
@@ -67,3 +48,4 @@ chromedriver.exe
 # Temporary files
 *.tmp
 *.bak
+

@@ -1,0 +1,12 @@
+google-api-python-client
+google-auth-oauthlib
+google-auth
+google-auth-httplib2
+undetected-chromedriver
+selenium
+moviepy
+opencv-python
+click
+typer
+python-dotenv
+pydantic

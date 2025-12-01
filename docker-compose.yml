@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  video-publisher:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    command: tail -f /dev/null # Keep container running for development/executing commands

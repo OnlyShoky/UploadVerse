@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video_publisher"
+version = "0.1.0"
+description = "A multi-interface video publishing automation system."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+  {name = "UploadVerse Team", email = "info@uploadverse.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "google-api-python-client",
+    "google-auth-oauthlib",
+    "google-auth",
+    "google-auth-httplib2",
+    "undetected-chromedriver",
+    "selenium",
+    "moviepy",
+    "opencv-python",
+    "click",
+    "typer",
+    "python-dotenv",
+    "pydantic"
+]
+
+[project.optional-dependencies]
+api = ["flask"]
+dev = ["pytest", "black", "isort", "flake8"]
+
+[project.scripts]
+video-publisher = "cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["src", "."]  # Include src and current directory to find cli and api if they are packages
+include = ["video_publisher*", "cli*", "api*"]
+namespaces = false

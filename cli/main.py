@@ -86,27 +86,53 @@ def upload(
 @app.command()
 def status():
     """
-    Show authentication status for all platforms.
+    Show system status, authentication, and rate limits.
     """
-    console.print("\n[bold blue]🔐 Platform Authentication Status[/bold blue]\n")
+    publisher = get_publisher()
+    
+    # 1. System Status
+    console.print("\n[bold blue]🛡️  System Status[/bold blue]")
+    if publisher.emergency_stop.is_triggered():
+        console.print("🚨 [bold red]EMERGENCY STOP ACTIVE[/bold red] - Uploads are disabled")
+    else:
+        console.print("✅ [green]System Operational[/green]")
+    console.print("")
+
+    # 2. Platform Status
+    console.print("[bold blue]🔐 Platform Status[/bold blue]")
     
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Platform")
-    table.add_column("Authenticated")
-    table.add_column("Notes")
+    table.add_column("Auth Status")
+    table.add_column("Daily Usage")
+    table.add_column("Remaining")
     
-    # Check each platform
-    platforms_info = [
-        ("YouTube", "OAuth2 token required"),
-        ("TikTok", "Browser session required"),
-        ("Instagram", "Browser session required"),
-    ]
+    # Map string names to Platform enum
+    platforms_map = {
+        "YouTube": Platform.YOUTUBE,
+        "TikTok": Platform.TIKTOK,
+        "Instagram": Platform.INSTAGRAM
+    }
     
-    for platform_name, notes in platforms_info:
-        # This is a simplified status check
-        # In a real implementation, you'd check actual authentication
-        status = "[yellow]Unknown[/yellow]"
-        table.add_row(platform_name, status, notes)
+    for name, platform_enum in platforms_map.items():
+        # Check Auth
+        auth_status = "[red]Not Configured[/red]"
+        if platform_enum in publisher.uploaders:
+            uploader = publisher.uploaders[platform_enum]
+            if uploader.is_authenticated():
+                auth_status = "[green]Authenticated[/green]"
+            else:
+                auth_status = "[yellow]Needs Login[/yellow]"
+        
+        # Check Rate Limits
+        remaining = publisher.rate_limiter.get_remaining(platform_enum)
+        limit = publisher.rate_limiter.limits.get(platform_enum, 5)
+        used = limit - remaining
+        
+        usage_str = f"{used}/{limit}"
+        remaining_str = f"[green]{remaining}[/green]" if remaining > 0 else "[red]0[/red]"
+        
+        table.add_row(name, auth_status, usage_str, remaining_str)
     
     console.print(table)
     console.print("\n[dim]Use 'video-publisher auth <platform>' to authenticate[/dim]")

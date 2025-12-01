@@ -49,3 +49,6 @@ chromedriver.exe
 *.tmp
 *.bak
 
+client_secrets.json
+data/
+*.pickle

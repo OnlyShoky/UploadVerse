@@ -33,6 +33,29 @@ class YouTubeUploader(BasePlatform):
         self.creds: Optional[Credentials] = None
         self.youtube = None
         
+        # Load existing credentials if available
+        if os.path.exists(self.token_file):
+            try:
+                with open(self.token_file, 'rb') as token:
+                    self.creds = pickle.load(token)
+                # Build YouTube service if credentials are valid
+                if self.creds and self.creds.valid:
+                    self.youtube = build('youtube', 'v3', credentials=self.creds)
+                    print("✅ Loaded existing YouTube credentials")
+                # Refresh if expired
+                elif self.creds and self.creds.expired and self.creds.refresh_token:
+                    print("Refreshing expired YouTube credentials...")
+                    self.creds.refresh(Request())
+                    self.youtube = build('youtube', 'v3', credentials=self.creds)
+                    # Save refreshed token
+                    with open(self.token_file, 'wb') as token:
+                        pickle.dump(self.creds, token)
+                    print("✅ Refreshed YouTube credentials")
+            except Exception as e:
+                print(f"⚠️  Warning: Could not load token file: {e}")
+                self.creds = None
+                self.youtube = None
+        
     def authenticate(self) -> None:
         """
         Authenticate with YouTube using OAuth2.
@@ -87,7 +110,12 @@ class YouTubeUploader(BasePlatform):
         Returns:
             UploadResult object.
         """
+        print(f"🎬 YouTube upload starting...")
+        print(f"   Authenticated: {self.is_authenticated()}")
+        print(f"   YouTube client: {self.youtube is not None}")
+        
         if not self.is_authenticated():
+            print("   Running authentication...")
             self.authenticate()
         
         try:
@@ -104,12 +132,17 @@ class YouTubeUploader(BasePlatform):
                 }
             }
             
+            print(f"   Title: {body['snippet']['title']}")
+            print(f"   Privacy: {body['status']['privacyStatus']}")
+            
             # Create media upload
             media = MediaFileUpload(
                 video_path,
                 chunksize=1024 * 1024,  # 1MB chunks
                 resumable=True
             )
+            
+            print(f"   Initiating upload...")
             
             # Execute upload
             request = self.youtube.videos().insert(
@@ -122,10 +155,14 @@ class YouTubeUploader(BasePlatform):
             while response is None:
                 status, response = request.next_chunk()
                 if status:
-                    print(f"Upload progress: {int(status.progress() * 100)}%")
+                    progress = int(status.progress() * 100)
+                    print(f"   Upload progress: {progress}%")
             
             video_id = response['id']
             video_url = f"https://www.youtube.com/watch?v={video_id}"
+            
+            print(f"✅ YouTube upload successful!")
+            print(f"   URL: {video_url}")
             
             return UploadResult(
                 platform=Platform.YOUTUBE,
@@ -134,14 +171,20 @@ class YouTubeUploader(BasePlatform):
             )
             
         except HttpError as e:
+            error_msg = f"HTTP error {e.resp.status}: {e.content.decode()}"
+            print(f"❌ YouTube upload failed: {error_msg}")
             return UploadResult(
                 platform=Platform.YOUTUBE,
                 success=False,
-                error=f"HTTP error: {e.resp.status} - {e.content.decode()}"
+                error=error_msg
             )
         except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            print(f"❌ YouTube upload failed: {error_msg}")
+            import traceback
+            traceback.print_exc()
             return UploadResult(
                 platform=Platform.YOUTUBE,
                 success=False,
-                error=str(e)
+                error=error_msg
             )

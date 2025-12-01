@@ -186,7 +186,45 @@ def platforms():
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint."""
+    publisher = get_publisher()
+    if publisher.emergency_stop.is_triggered():
+        return jsonify({'status': 'emergency_stop_active'}), 503
     return jsonify({'status': 'healthy'}), 200
+
+@app.route('/metrics', methods=['GET'])
+def metrics():
+    """
+    Get system metrics and rate limits.
+    """
+    publisher = get_publisher()
+    
+    metrics_data = {
+        'system_status': 'emergency_stop' if publisher.emergency_stop.is_triggered() else 'operational',
+        'platforms': {}
+    }
+    
+    platforms_map = {
+        "youtube": Platform.YOUTUBE,
+        "tiktok": Platform.TIKTOK,
+        "instagram": Platform.INSTAGRAM
+    }
+    
+    for name, platform_enum in platforms_map.items():
+        remaining = publisher.rate_limiter.get_remaining(platform_enum)
+        limit = publisher.rate_limiter.limits.get(platform_enum, 5)
+        used = limit - remaining
+        
+        metrics_data['platforms'][name] = {
+            'daily_limit': limit,
+            'used': used,
+            'remaining': remaining,
+            'authenticated': False
+        }
+        
+        if platform_enum in publisher.uploaders:
+            metrics_data['platforms'][name]['authenticated'] = publisher.uploaders[platform_enum].is_authenticated()
+            
+    return jsonify(metrics_data)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

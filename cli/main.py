@@ -2,6 +2,7 @@
 Video Publisher CLI - Command-line interface for video uploads.
 """
 import typer
+import json
 from typing import Optional, List
 from pathlib import Path
 from rich.console import Console
@@ -9,6 +10,13 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from video_publisher import upload_video, get_publisher, Platform
+from video_publisher.metadata import (
+    export_metadata,
+    import_metadata,
+    generate_template,
+    validate_metadata,
+    merge_metadata
+)
 
 app = typer.Typer(
     name="video-publisher",
@@ -24,6 +32,11 @@ def upload(
         None,
         "--platforms", "-p",
         help="Comma-separated list of platforms (youtube,tiktok,instagram) or 'all'"
+    ),
+    metadata_file: Optional[Path] = typer.Option(
+        None,
+        "--metadata", "-m",
+        help="JSON metadata file (CLI args override JSON values)"
     ),
     title: Optional[str] = typer.Option(None, "--title", "-t", help="Video title"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Video description"),
@@ -47,12 +60,29 @@ def upload(
     
     # Prepare metadata
     metadata = {}
+    
+    # Load from JSON file if provided
+    if metadata_file:
+        try:
+            json_metadata = import_metadata(str(metadata_file))
+            console.print(f"[green]✓[/green] Loaded metadata from {metadata_file.name}")
+            metadata = json_metadata
+        except Exception as e:
+            console.print(f"[bold red]❌ Error loading metadata:[/bold red] {e}")
+            raise typer.Exit(code=1)
+    
+    # CLI arguments override JSON values
+    cli_metadata = {}
     if title:
-        metadata['title'] = title
+        cli_metadata['title'] = title
     if description:
-        metadata['description'] = description
+        cli_metadata['description'] = description
     if tags:
-        metadata['tags'] = [tag.strip() for tag in tags.split(',')]
+        cli_metadata['tags'] = [tag.strip() for tag in tags.split(',')]
+    
+    # Merge (CLI takes precedence)
+    if cli_metadata:
+        metadata = merge_metadata(metadata, cli_metadata)
     
     # Upload
     try:
@@ -187,6 +217,97 @@ def version():
     from video_publisher import __version__
     console.print(f"\n[bold]Video Publisher[/bold] version [cyan]{__version__}[/cyan]")
     console.print("[dim]Multi-platform video upload automation[/dim]\n")
+
+@app.command()
+def metadata(
+    action: str = typer.Argument(..., help="Action: export, template, validate"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path"),
+    title: Optional[str] = typer.Option(None, "--title", "-t", help="Video title"),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Video description"),
+    tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
+    input_file: Optional[Path] = typer.Option(None, "--input", "-i", help="Input JSON file to validate"),
+):
+    """
+    Manage video metadata (export, template, validate).
+    """
+    action = action.lower()
+    
+    if action == "template":
+        # Generate empty template
+        template = generate_template()
+        
+        if output:
+            try:
+                export_metadata(template, str(output))
+                console.print(f"[green]✓[/green] Template saved to: {output}")
+            except Exception as e:
+                console.print(f"[bold red]❌ Error:[/bold red] {e}")
+                raise typer.Exit(code=1)
+        else:
+            console.print("\n[bold blue]📄 Metadata Template:[/bold blue]")
+            console.print(json.dumps(template, indent=2))
+    
+    elif action == "export":
+        # Export metadata from CLI args
+        metadata_dict = {}
+        if title:
+            metadata_dict['title'] = title
+        if description:
+            metadata_dict['description'] = description
+        if tags:
+            metadata_dict['tags'] = [tag.strip() for tag in tags.split(',')]
+        
+        if not metadata_dict:
+            console.print("[bold yellow]⚠️  No metadata provided. Use --title, --description, or --tags[/bold yellow]")
+            console.print("[dim]Or use 'metadata template' to generate a template[/dim]")
+            raise typer.Exit(code=1)
+        
+        # Add defaults
+        template = generate_template()
+        for key in template:
+            if key not in metadata_dict:
+                metadata_dict[key] = template[key]
+        
+        if output:
+            try:
+                export_metadata(metadata_dict, str(output))
+                console.print(f"[green]✓[/green] Metadata exported to: {output}")
+            except Exception as e:
+                console.print(f"[bold red]❌ Error:[/bold red] {e}")
+                raise typer.Exit(code=1)
+        else:
+            console.print("\n[bold blue]📄 Metadata:[/bold blue]")
+            console.print(json.dumps(metadata_dict, indent=2))
+    
+    elif action == "validate":
+        # Validate JSON file
+        if not input_file:
+            console.print("[bold red]❌ Error:[/bold red] --input required for validate action")
+            raise typer.Exit(code=1)
+        
+        try:
+            metadata_dict = import_metadata(str(input_file))
+            console.print(f"[green]✓[/green] Valid metadata file: {input_file}")
+            
+            # Show summary
+            console.print("\n[bold blue]📋 Summary:[/bold blue]")
+            if 'title' in metadata_dict:
+                console.print(f"  Title: {metadata_dict['title']}")
+            if 'tags' in metadata_dict and metadata_dict['tags']:
+                console.print(f"  Tags: {len(metadata_dict['tags'])} tags")
+            if 'privacy_status' in metadata_dict:
+                console.print(f"  Privacy: {metadata_dict['privacy_status']}")
+            if 'description' in metadata_dict:
+                console.print(f"  Description: {metadata_dict['description']}")
+                
+        except Exception as e:
+            console.print(f"[bold red]❌ Invalid metadata file:[/bold red] {e}")
+            raise typer.Exit(code=1)
+    
+    else:
+        console.print(f"[bold red]❌ Unknown action:[/bold red] {action}")
+        console.print("[dim]Valid actions: export, template, validate[/dim]")
+        raise typer.Exit(code=1)
 
 if __name__ == "__main__":
     app()

@@ -3,12 +3,20 @@ API routes blueprint - REST API endpoints
 """
 import os
 import uuid
+import json
 import threading
 from pathlib import Path
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
+from io import BytesIO
 
 from video_publisher import upload_video, get_publisher, Platform
+from video_publisher.metadata import (
+    export_metadata,
+    import_metadata,
+    generate_template,
+    validate_metadata
+)
 
 api_bp = Blueprint('api', __name__)
 
@@ -56,7 +64,10 @@ def index():
             'POST /api/upload': 'Upload a video',
             'GET /api/status/<upload_id>': 'Get upload status',
             'GET /api/platforms': 'List available platforms',
-            'GET /api/metrics': 'Get system metrics'
+            'GET /api/metrics': 'Get system metrics',
+            'GET /api/metadata/template': 'Get metadata template',
+            'POST /api/metadata/import': 'Import and validate JSON metadata',
+            'POST /api/metadata/export': 'Export metadata as JSON'
         }
     })
 
@@ -208,3 +219,126 @@ def metrics():
             metrics_data['platforms'][name]['authenticated'] = publisher.uploaders[platform_enum].is_authenticated()
             
     return jsonify(metrics_data)
+
+# Metadata endpoints
+
+@api_bp.route('/metadata/template', methods=['GET'])
+def metadata_template():
+    """
+    Get a metadata template JSON.
+    
+    Query parameters:
+        - download: If 'true', return as downloadable file (default: false)
+    
+    Returns:
+        JSON template
+    """
+    template = generate_template()
+    
+    # Check if download is requested
+    if request.args.get('download') == 'true':
+        # Create BytesIO object for in-memory file
+        json_bytes = BytesIO()
+        json_bytes.write(json.dumps(template, indent=2, ensure_ascii=False).encode('utf-8'))
+        json_bytes.seek(0)
+        
+        return send_file(
+            json_bytes,
+            mimetype='application/json',
+            as_attachment=True,
+            download_name='metadata_template.json'
+        )
+    
+    return jsonify(template)
+
+@api_bp.route('/metadata/import', methods=['POST'])
+def metadata_import():
+    """
+    Import and validate JSON metadata from uploaded file.
+    
+    Form parameters:
+        - metadata: JSON file (required)
+    
+    Returns:
+        Validated metadata dictionary
+    """
+    # Check if file is present
+    if 'metadata' not in request.files:
+        return jsonify({'error': 'No metadata file provided'}), 400
+    
+    file = request.files['metadata']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if not file.filename.endswith('.json'):
+        return jsonify({'error': 'File must be a JSON file'}), 400
+    
+    try:
+        # Read file content
+        content = file.read().decode('utf-8')
+        metadata = json.loads(content)
+        
+        # Validate
+        is_valid, error = validate_metadata(metadata)
+        if not is_valid:
+            return jsonify({'error': f'Invalid metadata: {error}'}), 400
+        
+        return jsonify({
+            'success': True,
+            'metadata': metadata,
+            'message': 'Metadata imported and validated successfully'
+        })
+        
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'Invalid JSON: {str(e)}'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/metadata/export', methods=['POST'])
+def metadata_export():
+    """
+    Export metadata as JSON file.
+    
+    JSON body:
+        {
+            "title": "string",
+            "description": "string",
+            "tags": ["array"],
+            ...
+        }
+    
+    Returns:
+        JSON file download
+    """
+    try:
+        metadata = request.get_json()
+        
+        if not metadata:
+            return jsonify({'error': 'No metadata provided'}), 400
+        
+        # Validate
+        is_valid, error = validate_metadata(metadata)
+        if not is_valid:
+            return jsonify({'error': f'Invalid metadata: {error}'}), 400
+        
+        # Add timestamp if not present
+        template = generate_template()
+        if 'metadata_generated_at' not in metadata:
+            metadata['metadata_generated_at'] = template['metadata_generated_at']
+        
+        # Create BytesIO object for download
+        json_bytes = BytesIO()
+        json_bytes.write(json.dumps(metadata, indent=2, ensure_ascii=False).encode('utf-8'))
+        json_bytes.seek(0)
+        
+        return send_file(
+            json_bytes,
+            mimetype='application/json',
+            as_attachment=True,
+            download_name='video_metadata.json'
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+

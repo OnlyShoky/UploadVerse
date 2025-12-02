@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}UploadVerse - Video Publishing Automation{% endblock %}</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="{{ url_for('web.index') }}" class="logo">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+                        <path d="M12 10L22 16L12 22V10Z" fill="currentColor"/>
+                    </svg>
+                    <span>UploadVerse</span>
+                </a>
+                
+                <nav class="nav">
+                    <a href="{{ url_for('web.index') }}" class="nav-link {% if request.endpoint == 'web.index' %}active{% endif %}">Upload</a>
+                    <a href="#" class="nav-link" hx-get="{{ url_for('web.credentials_status') }}" hx-trigger="click" hx-target="#modal" hx-swap="innerHTML">Status</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="footer-text">UploadVerse v0.1.0 · Automated Video Publishing</p>
+        </div>
+    </footer>
+    
+    <!-- Modal Container for HTMX -->
+    <div id="modal"></div>
+    
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/uploads.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

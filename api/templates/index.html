@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Video - UploadVerse{% endblock %}
+
+{% block content %}
+<div class="upload-page">
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero">
+            <h1 class="hero-title">Upload Your Video</h1>
+            <p class="hero-subtitle">Automatically publish to YouTube, TikTok, and Instagram</p>
+        </div>
+
+        <!-- Upload Zone -->
+        <div class="upload-zone" id="upload-zone">
+            <form action="{{ url_for('web.upload') }}" method="POST" enctype="multipart/form-data" id="upload-form">
+                <div class="upload-area" id="drop-zone">
+                    <svg class="upload-icon" width="64" height="64" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+
+                    <h2 class="upload-title">Drag & drop your video here</h2>
+                    <p class="upload-text">or click to browse</p>
+                    <p class="upload-hint">MP4, MOV, AVI up to 4GB · Supports 16:9 and 9:16 formats</p>
+
+                    <input type="file" name="video" id="file-input" accept="video/mp4,video/quicktime,video/x-msvideo"
+                        required style="display: none;">
+
+                    <button type="button" class="btn btn-primary" id="browse-btn">
+                        Choose File
+                    </button>
+                </div>
+
+                <!-- File Preview (hidden initially) -->
+                <div class="file-preview" id="file-preview" style="display: none;">
+                    <div class="file-info">
+                        <div class="file-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <path d="M12 18v-6"></path>
+                                <path d="m9 15 3 3 3-3"></path>
+                            </svg>
+                        </div>
+                        <div class="file-details">
+                            <h3 class="file-name" id="file-name"></h3>
+                            <p class="file-size" id="file-size"></p>
+                        </div>
+                        <button type="button" class="btn-icon" id="remove-file" title="Remove file">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-large">
+                        Continue to Configuration
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Features -->
+        <div class="features">
+            <div class="feature">
+                <svg class="feature-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                <h3 class="feature-title">Secure</h3>
+                <p class="feature-text">Your credentials stay safe with OAuth2</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                <h3 class="feature-title">Smart Routing</h3>
+                <p class="feature-text">Auto-detects format and suggests platforms</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <h3 class="feature-title">Rate Limited</h3>
+                <p class="feature-text">Prevents account bans with smart limits</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

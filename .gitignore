@@ -49,6 +49,12 @@ chromedriver.exe
 *.tmp
 *.bak
 
-client_secrets.json
+# Data
 data/
+uploads/
+
+# Credentials
 *.pickle
+client_secrets.json
+
+

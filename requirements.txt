@@ -11,3 +11,8 @@ typer
 rich
 python-dotenv
 pydantic
+pytest
+black
+isort
+flake8
+flask

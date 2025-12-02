@@ -50,131 +50,153 @@
                         <dd>{{ upload.metadata.title }}</dd>
                         {% endif %}
 
-                        <h2 class="section-title">Ready to Publish?</h2>
+                        {% if upload.metadata.description %}
+                        <dt>Description:</dt>
+                        <dd>{{ upload.metadata.description[:100] }}{% if upload.metadata.description|length > 100
+                            %}...{% endif %}</dd>
+                        {% endif %}
 
-                        <div class="publish-card">
-                            <p class="publish-message">Your video will be uploaded to the selected platforms. This
-                                process may
-                                take several minutes.</p>
+                        {% if upload.metadata.privacy_status %}
+                        <dt>Privacy:</dt>
+                        <dd>
+                            {{ upload.metadata.privacy_status|capitalize }}
+                            {% if upload.metadata.publish_at %}
+                            <br>
+                            <span class="text-muted" style="font-size: 0.9em">
+                                Scheduled for: {{ upload.metadata.publish_at.replace('T', ' ') }}
+                            </span>
+                            {% endif %}
+                        </dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
 
-                            <div id="publish-status" style="display: none;">
-                                <!-- Progress Bar -->
-                                <div class="progress-bar">
-                                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
-                                </div>
-                                <p class="progress-text" id="progress-text">Starting upload...</p>
-                            </div>
+            <!-- Publish Actions -->
+            <div class="publish-section">
+                <h2 class="section-title">Ready to Publish?</h2>
 
-                            <div id="publish-results" style="display: none;">
-                                <!-- Results will be inserted here -->
-                            </div>
+                <div class="publish-card">
+                    <p class="publish-message">Your video will be uploaded to the selected platforms. This process may
+                        take several minutes.</p>
 
-                            <div class="publish-actions" id="publish-actions">
-                                <button type="button" class="btn btn-primary btn-large" id="publish-btn"
-                                    onclick="publishVideo('{{ upload.file_id }}')">
-                                    Publish Now
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2">
-                                        <path d="M5 12h14"></path>
-                                        <path d="M12 5l7 7-7 7"></path>
-                                    </svg>
-                                </button>
-
-                                <a href="{{ url_for('web.config', file_id=upload.file_id) }}"
-                                    class="btn btn-secondary">Back to
-                                    Edit</a>
-                            </div>
+                    <div id="publish-status" style="display: none;">
+                        <!-- Progress Bar -->
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
                         </div>
+                        <p class="progress-text" id="progress-text">Starting upload...</p>
+                    </div>
+
+                    <div id="publish-results" style="display: none;">
+                        <!-- Results will be inserted here -->
+                    </div>
+
+                    <div class="publish-actions" id="publish-actions">
+                        <button type="button" class="btn btn-primary btn-large" id="publish-btn"
+                            onclick="publishVideo('{{ upload.file_id }}')">
+                            Publish Now
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M5 12h14"></path>
+                                <path d="M12 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+
+                        <a href="{{ url_for('web.config', file_id=upload.file_id) }}" class="btn btn-secondary">Back to
+                            Edit</a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        async function publishVideo(fileId) {
-            const publishBtn = document.getElementById('publish-btn');
-            const publishActions = document.getElementById('publish-actions');
-            const publishStatus = document.getElementById('publish-status');
-            const publishResults = document.getElementById('publish-results');
-            const progressFill = document.getElementById('progress-fill');
-            const progressText = document.getElementById('progress-text');
+<script>
+    async function publishVideo(fileId) {
+        const publishBtn = document.getElementById('publish-btn');
+        const publishActions = document.getElementById('publish-actions');
+        const publishStatus = document.getElementById('publish-status');
+        const publishResults = document.getElementById('publish-results');
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
 
-            // Disable button
-            publishBtn.disabled = true;
-            publishStatus.style.display = 'block';
+        // Disable button
+        publishBtn.disabled = true;
+        publishStatus.style.display = 'block';
 
-            // Simulate progress (in real app, poll /api/progress/<job_id>)
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += 5;
-                if (progress <= 90) {
-                    progressFill.style.width = progress + '%';
-                    progressText.textContent = `Uploading... ${progress}%`;
-                }
-            }, 500);
+        // Simulate progress (in real app, poll /api/progress/<job_id>)
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 5;
+            if (progress <= 90) {
+                progressFill.style.width = progress + '%';
+                progressText.textContent = `Uploading... ${progress}%`;
+            }
+        }, 500);
 
-            try {
-                const response = await fetch(`/publish/${fileId}`, {
-                    method: 'POST'
-                });
+        try {
+            const response = await fetch(`/publish/${fileId}`, {
+                method: 'POST'
+            });
 
-                const data = await response.json();
+            const data = await response.json();
 
-                clearInterval(progressInterval);
-                progressFill.style.width = '100%';
-                progressText.textContent = 'Upload complete!';
+            clearInterval(progressInterval);
+            progressFill.style.width = '100%';
+            progressText.textContent = 'Upload complete!';
 
-                // Show results
-                setTimeout(() => {
-                    publishStatus.style.display = 'none';
-                    publishResults.style.display = 'block';
-
-                    if (data.status === 'success') {
-                        let resultsHTML = '<div class="results-success"><h3>✅ Success!</h3><div class="results-list">';
-
-                        data.results.forEach(result => {
-                            if (result.success) {
-                                resultsHTML += `
-                            <div class="result-item success">
-                                <strong>${result.platform}</strong>
-                                <a href="${result.url}" target="_blank" class="result-link">View Video →</a>
-                            </div>
-                        `;
-                            } else {
-                                resultsHTML += `
-                            <div class="result-item error">
-                                <strong>${result.platform}</strong>
-                                <span class="error-text">${result.error}</span>
-                            </div>
-                        `;
-                            }
-                        });
-
-                        resultsHTML += '</div><a href="/" class="btn btn-primary">Upload Another Video</a></div>';
-                        publishResults.innerHTML = resultsHTML;
-                    } else {
-                        publishResults.innerHTML = `
-                    <div class="results-error">
-                        <h3>❌ Upload Failed</h3>
-                        <p>${data.error}</p>
-                        <button onclick="location.reload()" class="btn btn-secondary">Try Again</button>
-                    </div>
-                `;
-                    }
-                }, 1000);
-
-            } catch (error) {
-                clearInterval(progressInterval);
-                publishResults.innerHTML = `
-            <div class="results-error">
-                <h3>❌ Error</h3>
-                <p>${error.message}</p>
-                <button onclick="location.reload()" class="btn btn-secondary">Try Again</button>
-            </div>
-        `;
+            // Show results
+            setTimeout(() => {
                 publishStatus.style.display = 'none';
                 publishResults.style.display = 'block';
-            }
+
+                if (data.status === 'success') {
+                    let resultsHTML = '<div class="results-success"><h3>✅ Success!</h3><div class="results-list">';
+
+                    data.results.forEach(result => {
+                        if (result.success) {
+                            resultsHTML += `
+                        <div class="result-item success">
+                            <strong>${result.platform}</strong>
+                            <a href="${result.url}" target="_blank" class="result-link">View Video →</a>
+                        </div>
+                    `;
+                        } else {
+                            resultsHTML += `
+                        <div class="result-item error">
+                            <strong>${result.platform}</strong>
+                            <span class="error-text">${result.error}</span>
+                        </div>
+                    `;
+                        }
+                    });
+
+                    resultsHTML += '</div><a href="/" class="btn btn-primary">Upload Another Video</a></div>';
+                    publishResults.innerHTML = resultsHTML;
+                } else {
+                    publishResults.innerHTML = `
+                <div class="results-error">
+                    <h3>❌ Upload Failed</h3>
+                    <p>${data.error}</p>
+                    <button onclick="location.reload()" class="btn btn-secondary">Try Again</button>
+                </div>
+            `;
+                }
+            }, 1000);
+
+        } catch (error) {
+            clearInterval(progressInterval);
+            publishResults.innerHTML = `
+        <div class="results-error">
+            <h3>❌ Error</h3>
+            <p>${error.message}</p>
+            <button onclick="location.reload()" class="btn btn-secondary">Try Again</button>
+        </div>
+    `;
+            publishStatus.style.display = 'none';
+            publishResults.style.display = 'block';
         }
-    </script>
-    {% endblock %}
+    }
+</script>
+{% endblock %}

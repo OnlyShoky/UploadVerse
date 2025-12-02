@@ -86,14 +86,20 @@ def save_config(file_id):
     
     # Get form data
     platforms = request.form.getlist('platforms')
+    
+    # Get schedule info
+    is_scheduled = request.form.get('is_scheduled') == 'on'  # Checkboxes return 'on' when checked
+    schedule_time = request.form.get('schedule_time')
+    
     metadata = {
         'title': request.form.get('title', ''),
         'description': request.form.get('description', ''),
         'tags': request.form.get('tags', '').split(',') if request.form.get('tags') else [],
         'privacy_status': request.form.get('privacy', 'public'),
         'category_id': request.form.get('category', '22'),
-        'publish_at': request.form.get('schedule_time') if request.form.get('privacy') == 'schedule' else None
+        'publish_at': schedule_time if is_scheduled else None  # FIXED!
     }
+
     
     # Update upload info
     upload_mgr.update_platforms(file_id, platforms)

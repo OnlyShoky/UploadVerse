@@ -170,61 +170,45 @@
                                 </select>
                             </div>
 
-                            <!-- Visibility Section -->
-                            <div class="form-group visibility-section">
-                                <label>Visibility</label>
-                                <div class="visibility-options">
-                                    <label class="visibility-option">
-                                        <input type="radio" name="privacy" value="public"
-                                            onchange="toggleSchedule(this.value)">
-                                        <span class="vis-label">Public</span>
-                                        <span class="vis-desc">Publish immediately</span>
-                                    </label>
-
-                                    <label class="visibility-option">
-                                        <input type="radio" name="privacy" value="schedule"
-                                            onchange="toggleSchedule(this.value)">
-                                        <span class="vis-label">Schedule</span>
-                                        <span class="vis-desc">Select date & time</span>
-                                    </label>
-
-                                    <label class="visibility-option">
-                                        <input type="radio" name="privacy" value="unlisted"
-                                            onchange="toggleSchedule(this.value)">
-                                        <span class="vis-label">Unlisted</span>
-                                        <span class="vis-desc">Anyone with link</span>
-                                    </label>
-
-                                    <label class="visibility-option">
-                                        <input type="radio" name="privacy" value="private" checked
-                                            onchange="toggleSchedule(this.value)">
-                                        <span class="vis-label">Private</span>
-                                        <span class="vis-desc">Only you can view</span>
-                                    </label>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="privacy">Privacy</label>
+                                    <select id="privacy" name="privacy" class="form-select">
+                                        <option value="private" selected>Private</option>
+                                        <option value="unlisted">Unlisted</option>
+                                        <option value="public">Public</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <!-- Schedule Input (Hidden by default) -->
-                            <div id="schedule-container" class="form-group"
-                                style="display: none; margin-top: 1rem; padding: 1rem; background: #F3F4F6; border-radius: 8px;">
-                                <label for="schedule_time">Scheduled Time <span class="required">*</span></label>
-                                <input type="datetime-local" id="schedule_time" name="schedule_time" class="form-input">
-                                <small class="form-hint">Video will be private until this time</small>
+                            <!-- Schedule Section -->
+                            <div class="form-group schedule-section">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="is_scheduled" name="is_scheduled"
+                                        onchange="toggleSchedule(this.checked)">
+                                    <span class="checkbox-text">Schedule for later</span>
+                                </label>
+
+                                <div id="schedule-container" style="display: none; margin-top: 1rem;">
+                                    <label for="schedule_time">Publish Date & Time <span
+                                            class="required">*</span></label>
+                                    <input type="datetime-local" id="schedule_time" name="schedule_time"
+                                        class="form-input">
+                                    <small class="form-hint">Video will be private until this time</small>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary">
+                                    Review & Publish
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        <polyline points="12 5 19 12 12 19"></polyline>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="form-actions">
-                        <a href="{{ url_for('web.index') }}" class="btn btn-secondary">Back</a>
-                        <button type="submit" class="btn btn-primary">
-                            Review & Publish
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                <polyline points="12 5 19 12 12 19"></polyline>
-                            </svg>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -244,11 +228,11 @@
     });
 
     // Toggle schedule input
-    function toggleSchedule(value) {
+    function toggleSchedule(isScheduled) {
         const container = document.getElementById('schedule-container');
         const input = document.getElementById('schedule_time');
 
-        if (value === 'schedule') {
+        if (isScheduled) {
             container.style.display = 'block';
             input.required = true;
 

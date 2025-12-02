@@ -115,37 +115,6 @@ class YouTubeUploader(BasePlatform):
             
         self.youtube = build('youtube', 'v3', credentials=self.creds)
 
-    def authenticate(self) -> None:
-        """
-        Authenticate with YouTube using OAuth2 (CLI/Desktop mode).
-        For web mode, use get_auth_url() and finish_auth().
-        """
-        # Load existing credentials if available
-        if os.path.exists(self.token_file):
-            with open(self.token_file, 'rb') as token:
-                self.creds = pickle.load(token)
-        
-        # If no valid credentials, perform OAuth flow
-        if not self.creds or not self.creds.valid:
-            if self.creds and self.creds.expired and self.creds.refresh_token:
-                self.creds.refresh(Request())
-            else:
-                if not os.path.exists(self.credentials_file):
-                    raise FileNotFoundError(
-                        f"YouTube credentials file not found: {self.credentials_file}. "
-                        "Download from Google Cloud Console."
-                    )
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_file, SCOPES
-                )
-                self.creds = flow.run_local_server(port=0)
-            
-            # Save credentials for next run
-            with open(self.token_file, 'wb') as token:
-                pickle.dump(self.creds, token)
-        
-        # Build YouTube service
-        self.youtube = build('youtube', 'v3', credentials=self.creds)
     
     def is_authenticated(self) -> bool:
         """

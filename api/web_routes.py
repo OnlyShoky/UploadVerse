@@ -91,7 +91,8 @@ def save_config(file_id):
         'description': request.form.get('description', ''),
         'tags': request.form.get('tags', '').split(',') if request.form.get('tags') else [],
         'privacy_status': request.form.get('privacy', 'public'),
-        'category_id': request.form.get('category', '22')
+        'category_id': request.form.get('category', '22'),
+        'publish_at': request.form.get('schedule_time') if request.form.get('privacy') == 'schedule' else None
     }
     
     # Update upload info
@@ -197,10 +198,29 @@ def auth_platform(platform):
     
     if platform == 'youtube':
         uploader = YouTubeUploader()
-        uploader.authenticate()
-        return redirect(url_for('web.index'))
+        # Use web-based auth flow
+        redirect_uri = url_for('web.oauth2callback', _external=True)
+        auth_url = uploader.get_auth_url(redirect_uri)
+        return redirect(auth_url)
     else:
         return jsonify({'error': f'Authentication for {platform} not yet implemented'}), 501
+
+@web_bp.route('/oauth2callback')
+def oauth2callback():
+    """Handle OAuth2 callback."""
+    from video_publisher.platforms.youtube.uploader import YouTubeUploader
+    
+    code = request.args.get('code')
+    if not code:
+        return jsonify({'error': 'No code provided'}), 400
+        
+    try:
+        uploader = YouTubeUploader()
+        redirect_uri = url_for('web.oauth2callback', _external=True)
+        uploader.finish_auth(code, redirect_uri)
+        return redirect(url_for('web.index'))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Serve uploaded videos
 from flask import send_from_directory

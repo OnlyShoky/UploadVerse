@@ -86,6 +86,65 @@ class YouTubeUploader(BasePlatform):
                 pickle.dump(self.creds, token)
         
         # Build YouTube service
+        if self.creds and self.creds.valid:
+            self.youtube = build('youtube', 'v3', credentials=self.creds)
+    
+    def get_auth_url(self, redirect_uri: str) -> str:
+        """
+        Generate the authorization URL for web-based flow.
+        """
+        flow = InstalledAppFlow.from_client_secrets_file(
+            self.credentials_file, SCOPES, redirect_uri=redirect_uri
+        )
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        return auth_url
+
+    def finish_auth(self, code: str, redirect_uri: str) -> None:
+        """
+        Exchange authorization code for credentials.
+        """
+        flow = InstalledAppFlow.from_client_secrets_file(
+            self.credentials_file, SCOPES, redirect_uri=redirect_uri
+        )
+        flow.fetch_token(code=code)
+        self.creds = flow.credentials
+        
+        # Save credentials
+        with open(self.token_file, 'wb') as token:
+            pickle.dump(self.creds, token)
+            
+        self.youtube = build('youtube', 'v3', credentials=self.creds)
+
+    def authenticate(self) -> None:
+        """
+        Authenticate with YouTube using OAuth2 (CLI/Desktop mode).
+        For web mode, use get_auth_url() and finish_auth().
+        """
+        # Load existing credentials if available
+        if os.path.exists(self.token_file):
+            with open(self.token_file, 'rb') as token:
+                self.creds = pickle.load(token)
+        
+        # If no valid credentials, perform OAuth flow
+        if not self.creds or not self.creds.valid:
+            if self.creds and self.creds.expired and self.creds.refresh_token:
+                self.creds.refresh(Request())
+            else:
+                if not os.path.exists(self.credentials_file):
+                    raise FileNotFoundError(
+                        f"YouTube credentials file not found: {self.credentials_file}. "
+                        "Download from Google Cloud Console."
+                    )
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.credentials_file, SCOPES
+                )
+                self.creds = flow.run_local_server(port=0)
+            
+            # Save credentials for next run
+            with open(self.token_file, 'wb') as token:
+                pickle.dump(self.creds, token)
+        
+        # Build YouTube service
         self.youtube = build('youtube', 'v3', credentials=self.creds)
     
     def is_authenticated(self) -> bool:
@@ -128,9 +187,14 @@ class YouTubeUploader(BasePlatform):
                     'categoryId': metadata.get('category_id', '22')
                 },
                 'status': {
-                    'privacyStatus': metadata.get('privacy_status', 'public')
+                    'privacyStatus': 'private' if metadata.get('publish_at') else metadata.get('privacy_status', 'public'),
+                    'publishAt': metadata.get('publish_at') + ':00Z' if metadata.get('publish_at') else None
                 }
             }
+            
+            # Remove publishAt if None (API doesn't like null values)
+            if not body['status']['publishAt']:
+                del body['status']['publishAt']
             
             print(f"   Title: {body['snippet']['title']}")
             print(f"   Privacy: {body['status']['privacyStatus']}")

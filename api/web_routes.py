@@ -161,9 +161,9 @@ def platform_form(platform_name):
     """Return platform-specific form HTML."""
     return render_template(f'components/platform_form_{platform_name}.html')
 
-@web_bp.route('/partials/status')
+@web_bp.route('/partials/credentials-status')
 def credentials_status():
-    """Return credentials status HTML."""
+    """Return credentials status HTML (for HTMX polling)."""
     publisher = get_publisher()
     
     auth_status = {}
@@ -186,6 +186,29 @@ def credentials_status():
             'limit': limit
         }
     
-    return render_template('components/status_indicator.html',
+    return render_template('components/credentials_status.html',
                          auth_status=auth_status,
                          rate_limits=rate_limits)
+
+@web_bp.route('/auth/<platform>')
+def auth_platform(platform):
+    """Initiate authentication for a platform."""
+    from video_publisher.platforms.youtube.uploader import YouTubeUploader
+    
+    if platform == 'youtube':
+        uploader = YouTubeUploader()
+        uploader.authenticate()
+        return redirect(url_for('web.index'))
+    else:
+        return jsonify({'error': f'Authentication for {platform} not yet implemented'}), 501
+
+# Serve uploaded videos
+from flask import send_from_directory
+
+@web_bp.route('/videos/<path:filename>')
+def serve_video(filename):
+    """Serve uploaded video files."""
+    import os
+    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
+    return send_from_directory(uploads_dir, filename)
+

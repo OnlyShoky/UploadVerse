@@ -34,7 +34,7 @@
                     </button>
                 </div>
 
-                <!-- File Preview (hidden initially) -->
+                <!-- File Preview (hidden initially, shown before auto-submit) -->
                 <div class="file-preview" id="file-preview" style="display: none;">
                     <div class="file-info">
                         <div class="file-icon">
@@ -50,23 +50,12 @@
                             <h3 class="file-name" id="file-name"></h3>
                             <p class="file-size" id="file-size"></p>
                         </div>
-                        <button type="button" class="btn-icon" id="remove-file" title="Remove file">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-large">
-                        Continue to Configuration
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                            <polyline points="12 5 19 12 12 19"></polyline>
-                        </svg>
-                    </button>
+                    <div class="uploading-message">
+                        <div class="spinner"></div>
+                        <p>Uploading and analyzing video...</p>
+                    </div>
                 </div>
             </form>
         </div>

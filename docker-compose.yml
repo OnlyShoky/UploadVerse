@@ -9,17 +9,17 @@ services:
     volumes:
       # Persist sessions, logs, and rate limits
       - ./data:/app/data
-      # Mount client_secrets.json if it exists
-      - ./client_secrets.json:/app/client_secrets.json:ro
+      # Mount environment file
+      - ./.env:/app/.env:ro
+      # Mount client_secrets.json if it exists (optional for YouTube)
+      # Uncomment the line below if you have client_secrets.json:
+      # - ./client_secrets.json:/app/client_secrets.json:ro
     environment:
       - FLASK_ENV=production
-      - STOP_UPLOADS=false
+      - PYTHONUNBUFFERED=1
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5000/health" ]
+      test: [ "CMD-SHELL", "curl -f http://localhost:5000/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
-  # Optional: Redis for future task queue
-  # redis:
-  #   image: redis:alpine
-  #   restart: always
+      start_period: 40s

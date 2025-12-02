@@ -58,7 +58,7 @@ def upload_video(
         }
         platform_enums = [platform_map[p.lower()] for p in platforms if p.lower() in platform_map]
     
-    return publisher.upload(video_path, platforms=platform_enums)
+    return publisher.upload(video_path, platforms=platform_enums, metadata=metadata)
 
 def configure(config: Dict) -> None:
     """

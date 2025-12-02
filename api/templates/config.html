@@ -134,7 +134,33 @@
 
                     <!-- Dynamic Forms Container -->
                     <div class="metadata-forms" id="metadata-forms">
-                        <h3 class="form-section-title">Metadata</h3>
+                        <div class="metadata-header">
+                            <h3 class="form-section-title">Metadata</h3>
+                            <div class="metadata-actions">
+                                <button type="button" class="btn-import" onclick="importMetadata()"
+                                    title="Import metadata from JSON file">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.5">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                    Import
+                                </button>
+                                <button type="button" class="btn-export" onclick="exportMetadata()"
+                                    title="Export current metadata to JSON file">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.5">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                    Export
+                                </button>
+                            </div>
+                        </div>
+                        <input type="file" id="metadata-file-input" accept=".json" style="display: none;"
+                            onchange="handleMetadataFile(event)">
 
                         <!-- YouTube Form -->
                         <div id="youtube-form"
@@ -247,6 +273,77 @@
             container.style.display = 'none';
             input.required = false;
         }
+    }
+
+    // Metadata Import/Export Functions
+    function importMetadata() {
+        document.getElementById('metadata-file-input').click();
+    }
+
+    function handleMetadataFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                const metadata = JSON.parse(e.target.result);
+
+                // Populate form fields
+                if (metadata.title) {
+                    document.getElementById('title').value = metadata.title;
+                    document.getElementById('title-count').textContent = metadata.title.length;
+                }
+                if (metadata.description) {
+                    document.getElementById('description').value = metadata.description;
+                }
+                if (metadata.tags && Array.isArray(metadata.tags)) {
+                    document.getElementById('tags').value = metadata.tags.join(', ');
+                }
+                if (metadata.category_id) {
+                    document.getElementById('category').value = metadata.category_id;
+                }
+                if (metadata.privacy_status) {
+                    document.getElementById('privacy').value = metadata.privacy_status;
+                }
+
+                // Show success message
+                alert('✓ Metadata imported successfully!');
+            } catch (error) {
+                alert('❌ Error: Invalid JSON file\n' + error.message);
+            }
+        };
+        reader.readAsText(file);
+
+        // Reset file input
+        event.target.value = '';
+    }
+
+    function exportMetadata() {
+        // Collect current form values
+        const metadata = {
+            title: document.getElementById('title').value || "",
+            description: document.getElementById('description').value || "",
+            tags: document.getElementById('tags').value
+                ? document.getElementById('tags').value.split(',').map(t => t.trim())
+                : [],
+            category_id: document.getElementById('category').value || "22",
+            privacy_status: document.getElementById('privacy').value || "private",
+            language: "en",
+            playlist_id: "",
+            metadata_generated_at: new Date().toISOString()
+        };
+
+        // Create blob and download
+        const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `metadata_${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 </script>
 {% endblock %}

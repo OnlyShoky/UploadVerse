@@ -1,276 +1,199 @@
-# Video Publisher
+# UploadVerse
 
-> **Status**: 🚧 Alpha Development Build v0.1.0  
-> **Last Updated**: December 1, 2025  
-> **Repository**: https://github.com/OnlyShoky/UploadVerse
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-A multi-interface video publishing automation system designed to detect video formats and route them to appropriate platforms (YouTube, TikTok, Instagram).
+**Multi-platform video publishing automation with smart format detection.**
 
-## ⚠️ CURRENT STATUS
-
-**What Works:**
-- ✅ Python package structure and imports
-- ✅ Core video routing logic (16:9 → YouTube, 9:16 → TikTok/IG)
-- ✅ 26/28 tests passing (93%)
-- ✅ All platform uploader code implemented
-
-**What Doesn't Work Yet:**
-- ❌ No real video uploads tested
-- ❌ No real authentication flows
-- ❌ CLI command not verified
-- ❌ Web API not tested
-- ❌ Docker not tested
-
-**📖 For detailed status**: See [PROJECT_STATUS.md](PROJECT_STATUS.md)  
-**🚀 Quick start guide**: See [GETTING_STARTED_NOW.md](GETTING_STARTED_NOW.md)
+Automatically upload videos to YouTube, TikTok, and Instagram with intelligent routing based on aspect ratio.
 
 ---
 
-## Features
-
-- **Format Detection**: Automatically detects 16:9 vs 9:16 aspect ratios *(logic implemented, not tested with real videos)*
-- **Multi-Platform Support**: 
-  - YouTube via official API *(code complete, needs credentials)*
-  - TikTok via browser automation *(code complete, needs testing)*
-  - Instagram Reels via browser automation *(code complete, needs testing)*
-- **Three Interfaces**:
-  - **Library**: Python package for programmatic use *(works)*
-  - **CLI**: Command-line interface *(code complete, not verified)*
-  - **API**: Flask-based web API *(code complete, not tested)*
-- **Dockerized**: Docker setup exists *(not tested)*
-
----
-
-## Installation
-
-### Using Virtual Environment (Recommended)
-
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/OnlyShoky/UploadVerse.git
-    cd UploadVerse
-    ```
-
-2.  Create and activate virtual environment:
-    ```bash
-    # Windows
-    python -m venv venv
-    venv\Scripts\activate
-    
-    # Linux/Mac  
-    python -m venv venv
-    source venv/bin/activate
-    ```
-
-3.  Install dependencies:
-    ```bash
-    # Core dependencies
-    pip install -r requirements.txt
-    
-    # Development dependencies (includes pytest) - RECOMMENDED
-    pip install -r requirements-dev.txt
-    
-    # API dependencies (optional)
-    pip install -r requirements-api.txt
-    ```
-
-### Using pip install (Alternative)
+## 🚀 Quick Start
 
 ```bash
-pip install -e .[dev,api]
-```
+# Clone and install
+git clone https://github.com/OnlyShoky/UploadVerse.git
+cd UploadVerse
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
 
----
+# Install
+pip install -r requirements.txt
+pip install -e .
 
-## ✅ Verified Working Commands
-
-```bash
-# Install dependencies (✅ WORKS)
-pip install -r requirements-dev.txt
-
-# Run core tests (✅ 5/5 PASSING)
-pytest tests/test_core.py -v
-
-# Run platform tests (✅ 11/11 PASSING - mocked)
-pytest tests/test_platforms.py -v
-
-# Import library (✅ WORKS)
-python -c "from video_publisher import __version__; print(__version__)"
-
-# Test routing logic (✅ WORKS)
-python -c "from video_publisher.core.platform_router import PlatformRouter; from video_publisher.core.models import VideoMetadata; r=PlatformRouter(); m=VideoMetadata(path='test.mp4', duration=60, width=1920, height=1080, aspect_ratio=1.77); print([p.value for p in r.route(m)])"
-```
-
----
-
-## ⚠️ Not Yet Verified
-
-```bash
-# CLI (code exists, not tested)
-video-publisher --help
-video-publisher upload test.mp4 --platforms youtube
-
-# Web API (code exists, not tested)
-flask --app api.app run
-curl -X POST -F "video=@test.mp4" http://localhost:5000/upload
-
-# Docker (not tested)
-docker-compose up --build
-```
-
----
-
-## Usage (Theoretical - Not Fully Tested)
-
-### CLI
-
-```bash
-# Upload video (requires authentication setup first)
-video-publisher upload test.mp4 --platforms youtube --title "My Video"
-
-# Authenticate with a platform
+# Authenticate YouTube
 video-publisher auth youtube
 
-# Check authentication status
+# Upload
+video-publisher upload video.mp4 --platforms youtube
+```
+
+---
+
+## 📋 Prerequisites
+
+- Python 3.10+
+- Google Cloud account (for YouTube)
+- Chrome browser (for TikTok/Instagram)
+
+---
+
+## ⚙️ Configuration
+
+Create `.env` file:
+```bash
+# YouTube (safe, recommended)
+YOUTUBE_CLIENT_SECRETS_FILE=client_secrets.json
+
+# TikTok (⚠️ use test accounts only)
+TIKTOK_HEADLESS=false
+
+# Instagram (🔴 high ban risk, use test accounts only)
+INSTAGRAM_HEADLESS=false
+```
+
+---
+
+## 🔑 Platform Setup
+
+### YouTube (Recommended)
+- Uses official Google API
+- Safe and reliable
+- [Setup Guide →](docs/youtube_setup.md)
+
+### TikTok
+- ⚠️ Browser automation (violates TOS)
+- Use test accounts only
+- [Setup Guide →](docs/tiktok_setup.md)
+
+### Instagram  
+- 🔴 High ban risk (violates TOS)
+- Use test accounts only
+- [Setup Guide →](docs/instagram_setup.md)
+
+---
+
+## 💻 CLI Usage
+
+```bash
+# Upload (auto-detects platform from aspect ratio)
+video-publisher upload video.mp4
+
+# Specify platform
+video-publisher upload video.mp4 --platforms youtube
+video-publisher upload video.mp4 --platforms tiktok
+video-publisher upload video.mp4 --platforms youtube,tiktok
+
+# With metadata
+video-publisher upload video.mp4 \
+  --platforms youtube \
+  --title "My Video" \
+  --description "Description" \
+  --tags "tag1,tag2"
+
+# Check status
 video-publisher status
+
+# Authenticate
+video-publisher auth youtube
+video-publisher auth tiktok
+video-publisher auth instagram
 ```
 
-### Library
-
-```python
-from video_publisher import upload_video
-
-# Auto-detect platforms based on video format
-results = upload_video('my_video.mp4')
-
-# Specify platforms explicitly  
-results = upload_video('my_video.mp4', platforms=['youtube'])
-
-# Add metadata
-results = upload_video(
-    'my_video.mp4',
-    platforms=['youtube'],
-    metadata={'title': 'My Video', 'description': 'Video description'}
-)
-
-for result in results:
-    if result.success:
-        print(f"✅ {result.platform}: {result.url}")
-    else:
-        print(f"❌ {result.platform}: {result.error}")
-```
-
-### Web API
-
-```bash
-# Start the server
-flask --app api.app run
-
-# Upload a video
-curl -X POST \
-  -F "video=@test.mp4" \
-  -F "platforms=youtube" \
-  -F "title=My Video" \
-  http://localhost:5000/upload
-
-# Check upload status  
-curl http://localhost:5000/status/<upload_id>
-
-# List platforms
-curl http://localhost:5000/platforms
-```
+**[Full CLI Reference →](docs/cli_usage.md)**
 
 ---
 
-## Testing
-
-```bash
-# All tests
-pytest
-
-# Specific test files
-pytest tests/test_core.py -v          # ✅ 5/5 passing
-pytest tests/test_platforms.py -v     # ✅ 11/11 passing (mocked)
-pytest tests/test_interfaces.py -v    # ⚠️ 10/12 passing
-
-# With coverage
-pytest --cov=video_publisher
-```
-
----
-
-## Known Issues
-
-1. **No Real Uploads**: Platform uploaders never tested with actual credentials
-2. **Authentication**: No working OAuth2/session management yet
-3. **Interface Tests**: 2 test failures in mock assertions
-4. **CLI Entry Point**: `video-publisher` command not verified
-5. **Docker**: Not tested with Docker Desktop
-6. **Real Videos**: MoviePy analyzer not tested with actual video files
-
-See [PROJECT_STATUS.md](PROJECT_STATUS.md) for full details.
-
----
-
-## Project Structure
+## 📁 File Structure
 
 ```
 UploadVerse/
-├── src/video_publisher/     # Core library
-│   ├── __init__.py          # Public API
-│   ├── core/                # Core engine
-│   │   ├── engine.py        # Main VideoPublisher
-│   │   ├── video_analyzer.py
-│   │   ├── platform_router.py
-│   │   └── models.py
-│   └── platforms/           # Platform uploaders
-│       ├── base.py
-│       ├── youtube/
-│       ├── tiktok/
-│       └── instagram/
-├── cli/                     # CLI interface
-│   └── main.py
-├── api/                     # Web API
-│   └── app.py
-├── tests/                   # Test suite
-├── requirements*.txt        # Dependencies
-├── Dockerfile
-└── docker-compose.yml
+├── .env                       ← Your config
+├── client_secrets.json        ← YouTube OAuth (from Google Cloud)
+├── data/
+│   ├── videos/               ← Your videos
+│   └── sessions/             ← Auth tokens (auto-created)
+│       ├── youtube_token.pickle
+│       ├── tiktok_session.pkl
+│       └── instagram_session.pkl
+├── docs/                     ← Documentation
+│   ├── youtube_setup.md
+│   ├── tiktok_setup.md
+│   ├── instagram_setup.md
+│   └── cli_usage.md
+└── src/                      ← Source code
 ```
 
 ---
 
-## Documentation
+## 🎨 Features
 
-- [PROJECT_STATUS.md](PROJECT_STATUS.md) - Detailed status audit
-- [GETTING_STARTED_NOW.md](GETTING_STARTED_NOW.md) - What actually works today
-- [CHANGELOG.md](CHANGELOG.md) - Version history and changes
-
----
-
-## Contributing
-
-This is an early alpha build. If you want to contribute:
-
-1. Run the tests: `pytest tests/ -v`
-2. Check [PROJECT_STATUS.md](PROJECT_STATUS.md) for known issues
-3. See what needs fixing
-4. Submit a PR
+- **Smart Routing**: 16:9 → YouTube, 9:16 → TikTok/Instagram
+- **Multi-Platform**: Upload to multiple platforms simultaneously
+- **CLI Interface**: Simple command-line tool
+- **Python Library**: Programmatic access
+- **Authentication**: Persistent sessions/tokens
 
 ---
 
-## License
+## 📚 Documentation
 
-MIT
+| Guide | Description |
+|-------|-------------|
+| [YouTube Setup](docs/youtube_setup.md) | Google Cloud Console + OAuth setup |
+| [TikTok Setup](docs/tiktok_setup.md) | Browser automation setup (risky) |
+| [Instagram Setup](docs/instagram_setup.md) | Browser automation setup (very risky) |
+| [CLI Usage](docs/cli_usage.md) | All CLI commands and examples |
 
 ---
 
-## Acknowledgments
+## ⚠️ Important Warnings
 
-Built with:
-- [MoviePy](https://zulko.github.io/moviepy/) - Video processing
-- [Google API Python Client](https://github.com/googleapis/google-api-python-client) - YouTube uploads
+### TikTok
+- Automation violates TikTok Terms of Service
+- Account bans are common
+- **Always use test accounts**
+
+### Instagram
+- Automation violates Instagram Terms of Service
+- Account bans are almost guaranteed
+- **Never use your personal account**
+- Very high risk
+
+### YouTube
+- ✅ Uses official API (safe)
+- No TOS violations
+- Recommended platform
+
+---
+
+## 🧪 Testing
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+---
+
+## 📄 License
+
+MIT License
+
+---
+
+## 🙏 Built With
+
+- [Google API Python Client](https://github.com/googleapis/google-api-python-client) - YouTube API
 - [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver) - Stealth automation
+- [Selenium](https://www.selenium.dev/) - Browser automation
+- [MoviePy](https://zulko.github.io/moviepy/) - Video processing
 - [Typer](https://typer.tiangolo.com/) - CLI framework
-- [Flask](https://flask.palletsprojects.com/) - Web API
-- [Rich](https://rich.readthedocs.io/) - Beautiful terminal output
+
+---
+
+**Version:** 0.1.0  
+**Status:** Alpha  
+**Repository:** https://github.com/OnlyShoky/UploadVerse

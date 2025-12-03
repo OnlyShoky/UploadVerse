@@ -307,6 +307,20 @@
                     document.getElementById('privacy').value = metadata.privacy_status;
                 }
 
+                // Handle scheduling
+                if (metadata.scheduling) {
+                    const isScheduled = !metadata.scheduling.publish_now;
+                    document.getElementById('is_scheduled').checked = isScheduled;
+                    toggleSchedule(isScheduled);
+
+                    if (metadata.scheduling.scheduled_time) {
+                        // Convert ISO string to datetime-local format
+                        const date = new Date(metadata.scheduling.scheduled_time);
+                        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+                        document.getElementById('schedule_time').value = date.toISOString().slice(0, 16);
+                    }
+                }
+
                 // Show success message
                 alert('✓ Metadata imported successfully!');
             } catch (error) {
@@ -321,6 +335,9 @@
 
     function exportMetadata() {
         // Collect current form values
+        const isScheduled = document.getElementById('is_scheduled').checked;
+        const scheduleTime = document.getElementById('schedule_time').value;
+
         const metadata = {
             title: document.getElementById('title').value || "",
             description: document.getElementById('description').value || "",
@@ -331,7 +348,11 @@
             privacy_status: document.getElementById('privacy').value || "private",
             language: "en",
             playlist_id: "",
-            metadata_generated_at: new Date().toISOString()
+            metadata_generated_at: new Date().toISOString(),
+            scheduling: {
+                publish_now: !isScheduled,
+                scheduled_time: isScheduled && scheduleTime ? new Date(scheduleTime).toISOString() : null
+            }
         };
 
         // Create blob and download

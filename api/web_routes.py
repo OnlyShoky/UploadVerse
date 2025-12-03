@@ -97,7 +97,11 @@ def save_config(file_id):
         'tags': request.form.get('tags', '').split(',') if request.form.get('tags') else [],
         'privacy_status': request.form.get('privacy', 'public'),
         'category_id': request.form.get('category', '22'),
-        'publish_at': schedule_time if is_scheduled else None  # FIXED!
+        'category_id': request.form.get('category', '22'),
+        'scheduling': {
+            'publish_now': not is_scheduled,
+            'scheduled_time': schedule_time if is_scheduled else None
+        }
     }
 
     

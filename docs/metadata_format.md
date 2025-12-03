@@ -15,7 +15,13 @@ Complete specification for video metadata JSON files used by UploadVerse.
   "category_id": "string (YouTube only)",
   "language": "string (ISO 639-1)",
   "privacy_status": "public|private|unlisted",
-  "metadata_generated_at": "ISO 8601 timestamp"
+  "language": "string (ISO 639-1)",
+  "privacy_status": "public|private|unlisted",
+  "metadata_generated_at": "ISO 8601 timestamp",
+  "scheduling": {
+    "publish_now": false,
+    "scheduled_time": "ISO 8601 timestamp (optional)"
+  }
 }
 ```
 
@@ -85,6 +91,20 @@ Listen and memorize the complete recitation..."
 - **Auto-generated:** Automatically added on export
 - **Example:** `"2025-12-02T19:12:32.767512+00:00"`
 
+### `scheduling` (object, optional)
+- **Description:** Scheduling configuration
+- **Fields:**
+  - `publish_now` (boolean): If true, publish immediately (default: false)
+  - `scheduled_time` (string): ISO 8601 timestamp for scheduled publication
+- **Used by:** YouTube (sets privacy to private until time), TikTok/Instagram (ignored/publish now)
+- **Example:**
+```json
+{
+  "publish_now": false,
+  "scheduled_time": "2025-12-25T10:00:00Z"
+}
+```
+
 ---
 
 ## Complete Example
@@ -113,7 +133,12 @@ Listen and memorize the complete recitation..."
   "category_id": "10",
   "language": "en",
   "privacy_status": "public",
-  "metadata_generated_at": "2025-12-02T19:12:32.767512+00:00"
+  "privacy_status": "public",
+  "metadata_generated_at": "2025-12-02T19:12:32.767512+00:00",
+  "scheduling": {
+    "publish_now": false,
+    "scheduled_time": "2025-12-25T10:00:00Z"
+  }
 }
 ```
 

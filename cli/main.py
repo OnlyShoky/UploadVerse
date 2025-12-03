@@ -41,6 +41,8 @@ def upload(
     title: Optional[str] = typer.Option(None, "--title", "-t", help="Video title"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Video description"),
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
+    publish_now: bool = typer.Option(False, "--publish-now", help="Publish immediately"),
+    scheduled_time: Optional[str] = typer.Option(None, "--scheduled-time", help="Schedule publication time (ISO 8601)"),
 ):
     """
     Upload a video to one or more platforms.
@@ -79,6 +81,13 @@ def upload(
         cli_metadata['description'] = description
     if tags:
         cli_metadata['tags'] = [tag.strip() for tag in tags.split(',')]
+    
+    # Handle scheduling in CLI
+    if publish_now or scheduled_time:
+        cli_metadata['scheduling'] = {
+            'publish_now': publish_now,
+            'scheduled_time': scheduled_time
+        }
     
     # Merge (CLI takes precedence)
     if cli_metadata:
@@ -225,6 +234,8 @@ def metadata(
     title: Optional[str] = typer.Option(None, "--title", "-t", help="Video title"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Video description"),
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
+    publish_now: bool = typer.Option(False, "--publish-now", help="Publish immediately"),
+    scheduled_time: Optional[str] = typer.Option(None, "--scheduled-time", help="Schedule publication time (ISO 8601)"),
     input_file: Optional[Path] = typer.Option(None, "--input", "-i", help="Input JSON file to validate"),
 ):
     """
@@ -256,6 +267,13 @@ def metadata(
             metadata_dict['description'] = description
         if tags:
             metadata_dict['tags'] = [tag.strip() for tag in tags.split(',')]
+        
+        # Handle scheduling
+        if publish_now or scheduled_time:
+            metadata_dict['scheduling'] = {
+                'publish_now': publish_now,
+                'scheduled_time': scheduled_time
+            }
         
         if not metadata_dict:
             console.print("[bold yellow]⚠️  No metadata provided. Use --title, --description, or --tags[/bold yellow]")
@@ -299,6 +317,9 @@ def metadata(
                 console.print(f"  Privacy: {metadata_dict['privacy_status']}")
             if 'description' in metadata_dict:
                 console.print(f"  Description: {metadata_dict['description']}")
+            if 'scheduling' in metadata_dict:
+                sched = metadata_dict['scheduling']
+                console.print(f"  Scheduling: Publish Now={sched.get('publish_now')}, Time={sched.get('scheduled_time')}")
                 
         except Exception as e:
             console.print(f"[bold red]❌ Invalid metadata file:[/bold red] {e}")

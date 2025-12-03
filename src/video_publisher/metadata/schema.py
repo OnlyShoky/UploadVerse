@@ -42,6 +42,21 @@ METADATA_SCHEMA = {
         "metadata_generated_at": {
             "type": "string",
             "description": "Timestamp when metadata was generated"
+        },
+        "scheduling": {
+            "type": "object",
+            "properties": {
+                "publish_now": {
+                    "type": "boolean",
+                    "description": "Whether to publish immediately"
+                },
+                "scheduled_time": {
+                    "type": ["string", "null"],
+                    "description": "ISO 8601 timestamp for scheduled publish"
+                }
+            },
+            "required": ["publish_now"],
+            "description": "Publishing schedule configuration"
         }
     },
     "required": [],  # No required fields - all optional

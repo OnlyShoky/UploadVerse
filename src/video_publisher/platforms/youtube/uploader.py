@@ -148,6 +148,21 @@ class YouTubeUploader(BasePlatform):
         
         try:
             # Prepare video metadata
+            # Handle scheduling
+            scheduling = metadata.get('scheduling', {})
+            scheduled_time = scheduling.get('scheduled_time')
+            publish_now = scheduling.get('publish_now', False)
+            
+            privacy_status = metadata.get('privacy_status', 'public')
+            publish_at = None
+            
+            if scheduled_time:
+                privacy_status = 'private'  # Must be private for scheduled upload
+                # Ensure ISO format for YouTube
+                publish_at = scheduled_time
+                if not publish_at.endswith('Z') and not '+' in publish_at:
+                     publish_at += ':00Z'
+            
             body = {
                 'snippet': {
                     'title': metadata.get('title', Path(video_path).stem),
@@ -156,12 +171,12 @@ class YouTubeUploader(BasePlatform):
                     'categoryId': metadata.get('category_id', '22')
                 },
                 'status': {
-                    'privacyStatus': 'private' if metadata.get('publish_at') else metadata.get('privacy_status', 'public'),
-                    'publishAt': metadata.get('publish_at') + ':00Z' if metadata.get('publish_at') else None
+                    'privacyStatus': privacy_status,
+                    'publishAt': publish_at
                 }
             }
             
-            # Remove publishAt if None (API doesn't like null values)
+            # Remove publishAt if None
             if not body['status']['publishAt']:
                 del body['status']['publishAt']
             

@@ -33,6 +33,37 @@ video-publisher upload video.mp4 \
 - `--title`, `-t`: Video title
 - `--description`, `-d`: Video description  
 - `--tags`: Comma-separated tags
+- `--publish-now`: Publish immediately (overrides scheduling)
+- `--scheduled-time`: Schedule publication (ISO 8601 format, e.g., "2025-12-25T10:00:00")
+
+---
+
+### `video-publisher metadata`
+
+Manage video metadata (export, template, validate).
+
+```bash
+# Generate template
+video-publisher metadata template --output template.json
+
+# Export metadata
+video-publisher metadata export \
+  --title "My Video" \
+  --description "Description" \
+  --output metadata.json
+
+# Validate metadata file
+video-publisher metadata validate --input metadata.json
+```
+
+**Options:**
+- `--output`, `-o`: Output file path
+- `--input`, `-i`: Input file path (for validate)
+- `--title`, `-t`: Video title
+- `--description`, `-d`: Video description
+- `--tags`: Comma-separated tags
+- `--publish-now`: Publish immediately
+- `--scheduled-time`: Schedule publication time
 
 ---
 

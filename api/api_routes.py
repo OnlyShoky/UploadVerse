@@ -122,6 +122,16 @@ def upload():
     if request.form.get('tags'):
         metadata['tags'] = [tag.strip() for tag in request.form.get('tags').split(',')]
     
+    # Handle scheduling
+    publish_now = request.form.get('publish_now', 'false').lower() == 'true'
+    scheduled_time = request.form.get('scheduled_time')
+    
+    if publish_now or scheduled_time:
+        metadata['scheduling'] = {
+            'publish_now': publish_now,
+            'scheduled_time': scheduled_time if scheduled_time else None
+        }
+    
     # Initialize upload status
     upload_status[upload_id] = {
         'upload_id': upload_id,

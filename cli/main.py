@@ -8,6 +8,10 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from video_publisher import upload_video, get_publisher, Platform
 from video_publisher.metadata import (

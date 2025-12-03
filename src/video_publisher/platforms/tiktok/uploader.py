@@ -222,14 +222,112 @@ class TikTokUploader(BasePlatform):
                 except Exception as e:
                     print(f"Could not add caption: {e}")
             
+            # Handle scheduling
+            scheduling = metadata.get('scheduling', {})
+            publish_now = scheduling.get('publish_now', True)
+            
+            if not publish_now:
+                print("Switching to Schedule mode...")
+                try:
+                    # Click Schedule radio button
+                    schedule_radio = WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "input[value='schedule']"))
+                    )
+                    self.driver.execute_script("arguments[0].click();", schedule_radio)
+                    self._human_delay()
+                    
+                    # Handle date/time selection if scheduled_time is provided
+                    scheduled_time = scheduling.get('scheduled_time')
+                    if scheduled_time:
+                        from datetime import datetime
+                        
+                        # Parse ISO 8601 datetime
+                        try:
+                            dt = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
+                        except:
+                            print(f"Warning: Could not parse scheduled_time: {scheduled_time}")
+                            dt = None
+                        
+                        if dt:
+                            print(f"Setting scheduled time to: {dt}")
+                            
+                            # Set TIME first
+                            try:
+                                # Click time input to open picker
+                                time_input = WebDriverWait(self.driver, 5).until(
+                                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text'][readonly][value*=':']"))
+                                )
+                                time_input.click()
+                                self._human_delay(0.5, 1)
+                                
+                                # Select hour
+                                hour = dt.strftime('%H')  # 00-23 format
+                                hour_option = WebDriverWait(self.driver, 5).until(
+                                    EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'tiktok-timepicker-left') and text()='{hour}']"))
+                                )
+                                hour_option.click()
+                                self._human_delay(0.3, 0.6)
+                                
+                                # Select minute (round to nearest 5)
+                                minute = (dt.minute // 5) * 5
+                                minute_str = f"{minute:02d}"
+                                minute_option = WebDriverWait(self.driver, 5).until(
+                                    EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'tiktok-timepicker-right') and text()='{minute_str}']"))
+                                )
+                                minute_option.click()
+                                self._human_delay(0.5, 1)
+                                
+                                print(f"Time set to: {hour}:{minute_str}")
+                            except Exception as e:
+                                print(f"Failed to set time: {e}")
+                            
+                            # Set DATE
+                            try:
+                                # Click date input to open calendar
+                                date_input = WebDriverWait(self.driver, 5).until(
+                                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text'][readonly][value*='-']"))
+                                )
+                                date_input.click()
+                                self._human_delay(0.5, 1)
+                                
+                                # TikTok calendar uses simple span elements with class "day valid"
+                                # Text content is just the day number (1-31)
+                                day_number = str(dt.day)
+                                
+                                # Wait for calendar to be visible
+                                WebDriverWait(self.driver, 3).until(
+                                    EC.presence_of_element_located((By.XPATH, "//span[contains(@class, 'day') and contains(@class, 'valid')]"))
+                                )
+                                
+                                # Click the day
+                                try:
+                                    day_element = WebDriverWait(self.driver, 3).until(
+                                        EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'day') and contains(@class, 'valid') and text()='{day_number}']"))
+                                    )
+                                    day_element.click()
+                                    self._human_delay(0.5, 1)
+                                    print(f"Date set to day: {day_number}")
+                                except Exception as e:
+                                    print(f"Warning: Could not automatically select day {day_number}: {e}")
+                                    print("Please select the date manually.")
+                                    
+                            except Exception as e:
+                                print(f"Failed to open date picker: {e}")
+                    
+                except Exception as e:
+                    print(f"Failed to switch to schedule mode: {e}")
+
             # Click post button
             try:
-                # Try multiple selectors for Post button
+                # Try multiple selectors for Post/Schedule button
                 post_button = None
                 xpath_selectors = [
                     "//button[contains(., 'Post')]",
                     "//button[div[text()='Post']]",
-                    "//div[text()='Post']/parent::button"
+                    "//div[text()='Post']/parent::button",
+                    "//button[contains(., 'Schedule')]",
+                    "//button[div[text()='Schedule']]",
+                    "//div[text()='Schedule']/parent::button"
                 ]
                 
                 for xpath in xpath_selectors:

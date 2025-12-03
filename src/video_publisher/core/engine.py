@@ -6,6 +6,7 @@ from ..platforms.youtube.uploader import YouTubeUploader
 from ..platforms.tiktok.uploader import TikTokUploader
 from ..platforms.instagram.uploader import InstagramUploader
 from ..safety import RateLimiter, RiskDetector, EmergencyStop
+import os
 
 class VideoPublisher:
     def __init__(self):
@@ -73,9 +74,11 @@ class VideoPublisher:
         
         for platform in target_platforms:
             print(f"Processing {platform.value}...")
+
+
             
             # Rate Limit Check
-            if not self.rate_limiter.can_upload(platform):
+            if not self.rate_limiter.can_upload(platform) and not (os.environ.get('DRY_RUN', 'false').lower() == 'true' or os.environ.get('TEST_MODE', 'false').lower() == 'true'):
                 print(f"❌ Rate limit exceeded for {platform.value}. Skipping.")
                 results.append(UploadResult(
                     platform=platform,

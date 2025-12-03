@@ -76,23 +76,40 @@ class TikTokUploader(BasePlatform):
         self.driver.refresh()
         self._human_delay(2, 4)
         
-        # Check if logged in by looking for upload button
-        try:
-            upload_button = self.driver.find_element(By.XPATH, "//a[contains(@href, '/upload')]")
-            print("Already authenticated with TikTok")
-        except NoSuchElementException:
-            print("Not authenticated. Please log in manually in the browser window.")
-            print("Waiting for manual login... (60 seconds timeout)")
-            
-            # Wait for user to log in manually
+        # Check if logged in by verifying no login button exists and profile is accessible
+        def is_logged_in(driver):
             try:
-                WebDriverWait(self.driver, 60).until(
-                    EC.presence_of_element_located((By.XPATH, "//a[contains(@href, '/upload')]"))
-                )
-                print("Login successful!")
-                self._save_cookies()
-            except TimeoutException:
-                raise Exception("Login timeout. Please try again.")
+                # If login buttons are present, we are definitely NOT logged in
+                if driver.find_elements(By.XPATH, "//button[contains(., 'Log in')]"):
+                    return False
+                if driver.find_elements(By.XPATH, "//a[contains(., 'Log in')]"):
+                    return False
+                if driver.find_elements(By.ID, "header-login-button"):
+                    return False
+                    
+                # Must find profile link/icon to be sure
+                # Using a more specific check for the avatar container if possible, 
+                # but sticking to the profile link as a positive signal combined with the negative signal above
+                return bool(driver.find_elements(By.XPATH, "//a[contains(@href, '/@')]"))
+            except:
+                return False
+
+        if is_logged_in(self.driver):
+            print("Already authenticated with TikTok")
+            return
+
+        print("Not authenticated. Please log in manually in the browser window.")
+        print("Waiting for manual login... (120 seconds timeout)")
+        
+        # Wait for user to log in manually
+        try:
+            WebDriverWait(self.driver, 120).until(is_logged_in)
+            print("Login successful!")
+            # Wait a bit more for cookies to settle
+            time.sleep(3)
+            self._save_cookies()
+        except TimeoutException:
+            raise Exception("Login timeout. Please try again.")
     
     def is_authenticated(self) -> bool:
         """Check if authenticated with TikTok."""
@@ -100,8 +117,14 @@ class TikTokUploader(BasePlatform):
             return False
         
         try:
-            self.driver.find_element(By.XPATH, "//a[contains(@href, '/upload')]")
-            return True
+            # If login buttons are present, we are definitely NOT logged in
+            if self.driver.find_elements(By.XPATH, "//button[contains(., 'Log in')]"):
+                return False
+            if self.driver.find_elements(By.XPATH, "//a[contains(., 'Log in')]"):
+                return False
+                
+            # Look for link to own profile
+            return bool(self.driver.find_elements(By.XPATH, "//a[contains(@href, '/@')]"))
         except:
             return False
     

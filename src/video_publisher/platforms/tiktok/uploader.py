@@ -256,6 +256,9 @@ class TikTokUploader(BasePlatform):
                     self._human_delay()
                     
                     # Check for DRY_RUN or TEST_MODE
+                    print("#" * 50)
+                    print("DRY_RUN", os.environ.get('DRY_RUN', 'false'))
+                    print("#" * 50)
                     if os.environ.get('DRY_RUN', 'false').lower() == 'true' or os.environ.get('TEST_MODE', 'false').lower() == 'true':
                         print("[DRY RUN] Skipping actual post click")
                         return UploadResult(

@@ -19,9 +19,15 @@ python -m venv venv
 venv\Scripts\activate  # Windows
 source venv/bin/activate  # Linux/Mac
 
+# Upgrade pip
+python -m pip install --upgrade pip
+
 # Install
 pip install -r requirements.txt
 pip install -e .
+
+# Run app 
+python .\app.py
 
 # Authenticate YouTube
 video-publisher auth youtube

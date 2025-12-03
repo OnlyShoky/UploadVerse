@@ -43,7 +43,7 @@ class InstagramUploader(BasePlatform):
         # Mobile user agent for better Reels support
         options.add_argument('--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15')
         
-        self.driver = uc.Chrome(options=options)
+        self.driver = uc.Chrome(options=options, version_main=142)
         
     def _human_delay(self, min_seconds=1, max_seconds=3):
         """Simulate human-like delay."""

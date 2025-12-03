@@ -38,7 +38,7 @@ class TikTokUploader(BasePlatform):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         
-        self.driver = uc.Chrome(options=options)
+        self.driver = uc.Chrome(options=options, version_main=142)
         
     def _human_delay(self, min_seconds=1, max_seconds=3):
         """Simulate human-like delay."""

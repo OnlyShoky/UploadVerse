@@ -1,6 +1,6 @@
 google-api-python-client
 google-auth-oauthlib
-google-auth
+google-auth<2.42.0
 google-auth-httplib2
 undetected-chromedriver
 selenium

@@ -42,9 +42,10 @@ RUN mkdir -p data/sessions data/videos data/logs && \
 ENV PYTHONUNBUFFERED=1
 ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+ENV PYTHONPATH=/app/src
 
 # Expose API port
 EXPOSE 5000
 
 # Default command (can be overridden)
-CMD ["flask", "--app", "api.app", "run", "--host=0.0.0.0"]
+CMD ["flask", "--app", "app", "run", "--host=0.0.0.0"]

@@ -1,8 +1,8 @@
 services:
-  video-publisher:
+  uploadverse:
     build: .
-    image: video-publisher:latest
-    container_name: video-publisher
+    image: uploadverse:latest
+    container_name: uploadverse
     restart: unless-stopped
     ports:
       - "5000:5000"

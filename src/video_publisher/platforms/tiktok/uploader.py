@@ -7,6 +7,7 @@ from typing import Optional
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import undetected_chromedriver as uc
 
@@ -172,41 +173,119 @@ class TikTokUploader(BasePlatform):
             print("Waiting for video to process...")
             time.sleep(10)
             
-            # Add caption
-            caption = metadata.get('caption', '')
+            # Add caption (TikTok uses 'description' as caption)
+            # Priority: description -> title -> caption (legacy)
+            caption = metadata.get('title') or metadata.get('description')
+            tags = metadata.get('tags', '')
+
+            if tags: # Assuming 'tags' is a list of strings
+                formatted_tags = " ".join([f"#{tag.strip().replace(' ', '_')}" for tag in tags if tag.strip()])
+                if caption:
+                    caption += f" {formatted_tags}"
+                else:
+                    caption = formatted_tags
+            
             if caption:
                 try:
-                    caption_input = WebDriverWait(self.driver, 10).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[contenteditable='true']"))
-                    )
-                    caption_input.click()
-                    self._human_delay()
-                    caption_input.send_keys(caption)
-                    self._human_delay()
-                except:
-                    print("Could not add caption")
+                    # Try multiple selectors for caption input
+                    caption_input = None
+                    selectors = [
+                        ".public-DraftEditor-content",
+                        "div[contenteditable='true']",
+                        "div[data-contents='true']"
+                    ]
+                    
+                    for selector in selectors:
+                        try:
+                            caption_input = WebDriverWait(self.driver, 5).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                            )
+                            break
+                        except:
+                            continue
+                            
+                    if caption_input:
+                        caption_input.click()
+                        self._human_delay()
+                        # Clear existing text if any (sometimes hashtags are auto-added)
+                        caption_input.send_keys(Keys.CONTROL + "a")
+                        caption_input.send_keys(Keys.DELETE)
+                        self._human_delay(0.5, 1)
+                        
+                        # Type caption
+                        for char in caption:
+                            caption_input.send_keys(char)
+                            time.sleep(random.uniform(0.05, 0.15))
+                        self._human_delay()
+                    else:
+                        print("Could not find caption input field")
+                except Exception as e:
+                    print(f"Could not add caption: {e}")
             
             # Click post button
             try:
-                post_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Post')]"))
-                )
-                post_button.click()
-                self._human_delay(2, 4)
+                # Try multiple selectors for Post button
+                post_button = None
+                xpath_selectors = [
+                    "//button[contains(., 'Post')]",
+                    "//button[div[text()='Post']]",
+                    "//div[text()='Post']/parent::button"
+                ]
                 
-                # Wait for upload confirmation
-                time.sleep(5)
+                for xpath in xpath_selectors:
+                    try:
+                        post_button = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, xpath))
+                        )
+                        break
+                    except:
+                        continue
                 
-                return UploadResult(
-                    platform=Platform.TIKTOK,
-                    success=True,
-                    url="https://www.tiktok.com/@your_profile"  # TikTok doesn't give direct URL immediately
-                )
-            except:
+                if not post_button:
+                     # Try CSS selector as fallback
+                     try:
+                        post_button = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-e2e='post_video_button']"))
+                        )
+                     except:
+                        pass
+
+                if post_button:
+                    # Scroll into view to be safe
+                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
+                    self._human_delay()
+                    
+                    # Check for DRY_RUN or TEST_MODE
+                    if os.environ.get('DRY_RUN', 'false').lower() == 'true' or os.environ.get('TEST_MODE', 'false').lower() == 'true':
+                        print("[DRY RUN] Skipping actual post click")
+                        return UploadResult(
+                            platform=Platform.TIKTOK,
+                            success=True,
+                            url="https://www.tiktok.com/@your_profile (DRY RUN)"
+                        )
+
+                    post_button.click()
+                    self._human_delay(2, 4)
+                    
+                    # Wait for upload confirmation
+                    time.sleep(5)
+                    
+                    return UploadResult(
+                        platform=Platform.TIKTOK,
+                        success=True,
+                        url="https://www.tiktok.com/@your_profile"
+                    )
+                else:
+                    return UploadResult(
+                        platform=Platform.TIKTOK,
+                        success=False,
+                        error="Could not find Post button"
+                    )
+            except Exception as e:
                 return UploadResult(
                     platform=Platform.TIKTOK,
                     success=False,
-                    error="Failed to click post button"
+                    error=f"Failed to click post button: {e}"
                 )
                 
         except Exception as e:

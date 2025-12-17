@@ -33,7 +33,10 @@ python .\app.py
 video-publisher auth youtube
 
 # Upload
+# Upload
 video-publisher upload video.mp4 --platforms youtube
+video-publisher upload video.mp4 --platforms tiktok --metadata metadata.json
+video-publisher upload video1.mp4 video2.mp4 --platforms tiktok  # Batch upload
 ```
 
 ---
@@ -83,6 +86,7 @@ INSTAGRAM_HEADLESS=false
 
 ## 💻 CLI Usage
 
+### Basic Upload
 ```bash
 # Upload (auto-detects platform from aspect ratio)
 video-publisher upload video.mp4
@@ -90,15 +94,43 @@ video-publisher upload video.mp4
 # Specify platform
 video-publisher upload video.mp4 --platforms youtube
 video-publisher upload video.mp4 --platforms tiktok
-video-publisher upload video.mp4 --platforms youtube,tiktok
+```
 
-# With metadata
+### Advanced Features
+```bash
+# Custom Thumbnail
+video-publisher upload video.mp4 --platforms tiktok --thumbnail cover.jpg
+
+# With simple metadata
 video-publisher upload video.mp4 \
   --platforms youtube \
   --title "My Video" \
   --description "Description" \
   --tags "tag1,tag2"
+```
 
+### Batch Upload & Auto-Discovery
+Process multiple videos in a single browser session. Metadata files (`.json`) and thumbnails (`.jpg`/`.png`) are automatically detected if they share the same filename as the video.
+
+**Example: 3 Videos with unique metadata & thumbnails**
+Given these files:
+- `vids/clip1.mp4`, `vids/clip1.json`, `vids/clip1.jpg`
+- `vids/clip2.mp4`, `vids/clip2.json` (no thumb)
+- `vids/clip3.mp4` (no metadata, no thumb)
+
+Run:
+```bash
+video-publisher upload vids/clip1.mp4 vids/clip2.mp4 vids/clip3.mp4 --platforms tiktok
+```
+
+**What happens:**
+1. **clip1**: Uploads with title/tags from `clip1.json` AND custom cover `clip1.jpg`.
+2. **clip2**: Uploads with title/tags from `clip2.json`.
+3. **clip3**: Uploads with default settings.
+*All uploads occur in ONE browser session.*
+
+### Other Commands
+```bash
 # Check status
 video-publisher status
 

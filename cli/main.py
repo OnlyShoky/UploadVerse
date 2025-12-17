@@ -31,7 +31,7 @@ console = Console()
 
 @app.command()
 def upload(
-    video_path: Path = typer.Argument(..., help="Path to the video file", exists=True),
+    video_paths: List[Path] = typer.Argument(..., help="Path to video file(s)", exists=True),
     platforms: Optional[str] = typer.Option(
         None,
         "--platforms", "-p",
@@ -40,91 +40,134 @@ def upload(
     metadata_file: Optional[Path] = typer.Option(
         None,
         "--metadata", "-m",
-        help="JSON metadata file (CLI args override JSON values)"
+        help="JSON metadata file (Applied to ALL videos). If not provided, looks for {video}.json"
     ),
-    title: Optional[str] = typer.Option(None, "--title", "-t", help="Video title"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="Video description"),
-    tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
+    thumbnail_path: Optional[Path] = typer.Option(
+        None,
+        "--thumbnail",
+        help="Custom thumbnail image (Applied to ALL videos). If not provided, looks for {video}.jpg/png"
+    ),
+    title: Optional[str] = typer.Option(None, "--title", "-t", help="Video title (Applied to ALL videos)"),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Video description (Applied to ALL videos)"),
+    tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags (Applied to ALL videos)"),
     publish_now: bool = typer.Option(False, "--publish-now", help="Publish immediately"),
     scheduled_time: Optional[str] = typer.Option(None, "--scheduled-time", help="Schedule publication time (ISO 8601)"),
 ):
     """
-    Upload a video to one or more platforms.
+    Upload one or more videos to platforms.
     """
-    console.print(f"\n[bold blue]📹 Uploading:[/bold blue] {video_path.name}")
-    
-    # Parse platforms
+    # Parse platforms once
     platform_list = None
     if platforms:
         if platforms.lower() == 'all':
             platform_list = ['youtube', 'tiktok', 'instagram']
         else:
             platform_list = [p.strip() for p in platforms.split(',')]
-        console.print(f"[bold]Platforms:[/bold] {', '.join(platform_list)}")
-    else:
-        console.print("[bold]Platforms:[/bold] Auto-detect based on video format")
     
-    # Prepare metadata
-    metadata = {}
-    
-    # Load from JSON file if provided
-    if metadata_file:
-        try:
-            json_metadata = import_metadata(str(metadata_file))
-            console.print(f"[green]✓[/green] Loaded metadata from {metadata_file.name}")
-            metadata = json_metadata
-        except Exception as e:
-            console.print(f"[bold red]❌ Error loading metadata:[/bold red] {e}")
-            raise typer.Exit(code=1)
-    
-    # CLI arguments override JSON values
-    cli_metadata = {}
+    # Global metadata overrides (CLI args)
+    global_cli_metadata = {}
     if title:
-        cli_metadata['title'] = title
+        global_cli_metadata['title'] = title
     if description:
-        cli_metadata['description'] = description
+        global_cli_metadata['description'] = description
     if tags:
-        cli_metadata['tags'] = [tag.strip() for tag in tags.split(',')]
-    
-    # Handle scheduling in CLI
+        global_cli_metadata['tags'] = [tag.strip() for tag in tags.split(',')]
     if publish_now or scheduled_time:
-        cli_metadata['scheduling'] = {
+        global_cli_metadata['scheduling'] = {
             'publish_now': publish_now,
             'scheduled_time': scheduled_time
         }
-    
-    # Merge (CLI takes precedence)
-    if cli_metadata:
-        metadata = merge_metadata(metadata, cli_metadata)
-    
-    # Upload
+    if thumbnail_path:
+        global_cli_metadata['thumbnail_path'] = str(thumbnail_path)
+
+    # Process each video
+    total_videos = len(video_paths)
+    console.print(f"\n[bold blue]🚀 Starting batch upload for {total_videos} video(s)[/bold blue]")
+    if platform_list:
+        console.print(f"[bold]Platforms:[/bold] {', '.join(platform_list)}")
+    else:
+        console.print("[bold]Platforms:[/bold] Auto-detect based on video format")
+
     try:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            task = progress.add_task("Uploading video...", total=None)
-            results = upload_video(str(video_path), platforms=platform_list, metadata=metadata)
-            progress.update(task, completed=True)
+        # We reuse the publisher logic implicitly because accessing the singleton 
+        # inside the loop or just calling the sensitive functions usually keeps state if designed so.
+        # However, `upload_video` function in `__init__.py` gets a publisher instance.
+        # To ensure session persistence (reuse of browser), we should rely on the `get_publisher()` singleton behavior 
+        # which is already implemented in `src/video_publisher/__init__.py`.
         
-        # Display results
-        console.print("\n[bold green]✅ Upload Results:[/bold green]")
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Platform")
-        table.add_column("Status")
-        table.add_column("URL")
-        
-        for result in results:
-            status = "[green]Success[/green]" if result.success else "[red]Failed[/red]"
-            url = result.url or (result.error if result.error else "N/A")
-            table.add_row(result.platform.value, status, url)
-        
-        console.print(table)
-        
+        for index, video_path in enumerate(video_paths, 1):
+            console.print(f"\n[bold cyan]Processing [{index}/{total_videos}]:[/bold cyan] {video_path.name}")
+            
+            # 1. Determine Metadata
+            # Priority: CLI > --metadata file > {video}.json > default template
+            current_metadata = {}
+            
+            # A. Load from --metadata if provided (global)
+            if metadata_file:
+                try:
+                    current_metadata = import_metadata(str(metadata_file))
+                    console.print(f"  [dim]• Loaded global metadata: {metadata_file.name}[/dim]")
+                except Exception as e:
+                    console.print(f"  [bold red]❌ Error loading global metadata:[/bold red] {e}")
+                    continue # Skip this video? Or fail? Let's skip.
+
+            # B. Auto-detect {video}.json if no global metadata file OR to supplement?
+            # Usually strict: if global is given, use it. If not, look for local.
+            # But let's allow local to override global? Or global to override local?
+            # Plan says: "Explicitly provided --metadata file (applies to ALL videos)"
+            # So if NOT provided, check for local.
+            elif not metadata_file:
+                possible_json = video_path.with_suffix('.json')
+                if possible_json.exists():
+                    try:
+                        current_metadata = import_metadata(str(possible_json))
+                        console.print(f"  [dim]• Found local metadata: {possible_json.name}[/dim]")
+                    except Exception as e:
+                        console.print(f"  [red]⚠ Error loading local metadata: {e}[/red]")
+
+            # C. Auto-detect thumbnail if not provided globally
+            if not thumbnail_path:
+                # Check for same name with typical image extensions
+                for ext in ['.jpg', '.jpeg', '.png']:
+                    possible_thumb = video_path.with_suffix(ext)
+                    if possible_thumb.exists():
+                        current_metadata['thumbnail_path'] = str(possible_thumb)
+                        console.print(f"  [dim]• Found local thumbnail: {possible_thumb.name}[/dim]")
+                        break
+
+            # D. Merge CLI overrides (Highest priority)
+            if global_cli_metadata:
+                current_metadata = merge_metadata(current_metadata, global_cli_metadata)
+
+            # 2. Upload
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task(f"Uploading {video_path.name}...", total=None)
+                
+                # Call upload - the singleton pattern in `get_publisher` ensures browser reuse
+                try:
+                    results = upload_video(str(video_path), platforms=platform_list, metadata=current_metadata)
+                    progress.update(task, completed=True)
+                except Exception as e:
+                    # Catch individual upload errors so we don't crash the whole batch
+                    progress.update(task, completed=True) # Stop spinner
+                    console.print(f"  [bold red]❌ Upload Error:[/bold red] {e}")
+                    continue
+
+            # 3. Show Result for this video
+            for result in results:
+                status = "[green]Success[/green]" if result.success else "[red]Failed[/red]"
+                url = result.url or (result.error if result.error else "N/A")
+                console.print(f"  • {result.platform.value}: {status} - {url}")
+
     except Exception as e:
-        console.print(f"[bold red]❌ Error:[/bold red] {e}")
+        console.print(f"\n[bold red]❌ Critical Batch Error:[/bold red] {e}")
         raise typer.Exit(code=1)
+
+    console.print("\n[bold green]✨ Batch processing complete![/bold green]")
 
 @app.command()
 def status():

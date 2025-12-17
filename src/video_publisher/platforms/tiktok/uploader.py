@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import undetected_chromedriver as uc
 
@@ -39,6 +40,17 @@ class TikTokUploader(BasePlatform):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         
+        # Force English Language
+        options.add_argument('--lang=en-US')
+        options.add_argument('--accept-lang=en-US')
+        
+        # Set preferences for language
+        prefs = {
+            "intl.accept_languages": "en-US,en",
+            "profile.default_content_settings.popups": 0
+        }
+        options.add_experimental_option("prefs", prefs)
+        
         self.driver = uc.Chrome(options=options, version_main=142)
         
     def _human_delay(self, min_seconds=1, max_seconds=3):
@@ -69,7 +81,7 @@ class TikTokUploader(BasePlatform):
             self._init_driver()
         
         # Navigate to TikTok
-        self.driver.get('https://www.tiktok.com')
+        self.driver.get('https://www.tiktok.com/en/') # Force EN URL
         self._human_delay(2, 4)
         
         # Try to load existing cookies
@@ -80,7 +92,7 @@ class TikTokUploader(BasePlatform):
         # Check if logged in by verifying no login button exists and profile is accessible
         def is_logged_in(driver):
             try:
-                # If login buttons are present, we are definitely NOT logged in
+                # English only checks
                 if driver.find_elements(By.XPATH, "//button[contains(., 'Log in')]"):
                     return False
                 if driver.find_elements(By.XPATH, "//a[contains(., 'Log in')]"):
@@ -89,8 +101,6 @@ class TikTokUploader(BasePlatform):
                     return False
                     
                 # Must find profile link/icon to be sure
-                # Using a more specific check for the avatar container if possible, 
-                # but sticking to the profile link as a positive signal combined with the negative signal above
                 return bool(driver.find_elements(By.XPATH, "//a[contains(@href, '/@')]"))
             except:
                 return False
@@ -118,7 +128,7 @@ class TikTokUploader(BasePlatform):
             return False
         
         try:
-            # If login buttons are present, we are definitely NOT logged in
+            # English only checks
             if self.driver.find_elements(By.XPATH, "//button[contains(., 'Log in')]"):
                 return False
             if self.driver.find_elements(By.XPATH, "//a[contains(., 'Log in')]"):
@@ -132,38 +142,27 @@ class TikTokUploader(BasePlatform):
     def upload(self, video_path: str, metadata: dict) -> UploadResult:
         """
         Upload a video to TikTok.
-        
-        Args:
-            video_path: Path to the video file.
-            metadata: Dictionary with keys:
-                - caption: Video caption/description
-                - allow_comments: Boolean (default: True)
-                - allow_duet: Boolean (default: True)
-                - allow_stitch: Boolean (default: True)
-        
-        Returns:
-            UploadResult object.
         """
         if not self.is_authenticated():
             self.authenticate()
         
         try:
-            # Navigate to upload page
-            self.driver.get('https://www.tiktok.com/upload')
+            # Navigate to upload page (EN)
+            self.driver.get('https://www.tiktok.com/upload?lang=en')
             self._human_delay(2, 4)
             
-            # Check for CAPTCHA
-            if 'captcha' in self.driver.page_source.lower():
-                return UploadResult(
+            # Find and interact with file input
+            try:
+                # Find the file input - standard timeout
+                file_input = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
+                )
+            except TimeoutException:
+                 return UploadResult(
                     platform=Platform.TIKTOK,
                     success=False,
-                    error="CAPTCHA detected! Emergency stop triggered."
+                    error="Timeout waiting for upload area"
                 )
-            
-            # Find and interact with file input
-            file_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
-            )
             
             # Upload file
             file_input.send_keys(str(Path(video_path).absolute()))
@@ -174,11 +173,10 @@ class TikTokUploader(BasePlatform):
             time.sleep(10)
             
             # Add caption (TikTok uses 'description' as caption)
-            # Priority: description -> title -> caption (legacy)
             caption = metadata.get('title') or metadata.get('description')
             tags = metadata.get('tags', '')
 
-            if tags: # Assuming 'tags' is a list of strings
+            if tags:
                 formatted_tags = " ".join([f"#{tag.strip().replace(' ', '_')}" for tag in tags if tag.strip()])
                 if caption:
                     caption += f" {formatted_tags}"
@@ -207,7 +205,7 @@ class TikTokUploader(BasePlatform):
                     if caption_input:
                         caption_input.click()
                         self._human_delay()
-                        # Clear existing text if any (sometimes hashtags are auto-added)
+                        # Clear existing text
                         caption_input.send_keys(Keys.CONTROL + "a")
                         caption_input.send_keys(Keys.DELETE)
                         self._human_delay(0.5, 1)
@@ -221,6 +219,68 @@ class TikTokUploader(BasePlatform):
                         print("Could not find caption input field")
                 except Exception as e:
                     print(f"Could not add caption: {e}")
+            
+            # Handle Thumbnail Upload
+            thumbnail_path = metadata.get('thumbnail_path')
+            if thumbnail_path and os.path.exists(thumbnail_path):
+                print(f"Uploading thumbnail: {thumbnail_path}")
+                try:
+                    # 1. Click "Edit cover" (Strict English)
+                    try:
+                        edit_cover_btn = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Edit cover')]"))
+                        )
+                        edit_cover_btn.click()
+                        self._human_delay(1, 2)
+                        
+                        # 2. Click "Upload cover" (Strict English)
+                        upload_tab_btn = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Upload cover')]"))
+                        )
+                        upload_tab_btn.click()
+                        self._human_delay(1, 2)
+                        
+                        # 3. Upload file
+                        cover_file_input = WebDriverWait(self.driver, 5).until(
+                            EC.presence_of_element_located((By.XPATH, "//input[@type='file' and @accept='image/*']"))
+                        )
+                        cover_file_input.send_keys(str(Path(thumbnail_path).absolute()))
+                        self._human_delay(3, 5) # Process image
+                        
+                        # 4. Click Confirm / Close / X
+                        # Look for "Confirm" button (Strict English)
+                        try:
+                            confirm_btn = WebDriverWait(self.driver, 5).until(
+                                EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Confirm')]"))
+                            )
+                            confirm_btn.click()
+                        except:
+                            print("Confirm button not found, trying Close icon")
+                            # Fallback to close icon if Confirm doesn't exist
+                            close_btn = WebDriverWait(self.driver, 3).until(
+                                EC.element_to_be_clickable((By.XPATH, "//*[name()='svg' and contains(@class, 'close')]/ancestor::div[1]"))
+                            )
+                            close_btn.click()
+                            
+                        self._human_delay(2, 3) 
+                        
+                        # Wait for modal to disappear completely
+                        try:
+                            WebDriverWait(self.driver, 5).until(
+                                EC.invisibility_of_element_located((By.CLASS_NAME, "TUXModal-overlay"))
+                            )
+                        except:
+                            print("Warning: Modal might still be visible")
+                            
+                    except Exception as e:
+                        print(f"Thumbnail upload logic failed: {e}")
+                        # Ensure we try to close any open modal
+                        try:
+                            ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+                        except:
+                            pass
+                except Exception as e:
+                    print(f"Failed to upload thumbnail: {e}")
             
             # Handle scheduling
             scheduling = metadata.get('scheduling', {})
@@ -240,8 +300,6 @@ class TikTokUploader(BasePlatform):
                     scheduled_time = scheduling.get('scheduled_time')
                     if scheduled_time:
                         from datetime import datetime
-                        
-                        # Parse ISO 8601 datetime
                         try:
                             dt = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
                         except:
@@ -251,24 +309,21 @@ class TikTokUploader(BasePlatform):
                         if dt:
                             print(f"Setting scheduled time to: {dt}")
                             
-                            # Set TIME first
+                            # Set TIME
                             try:
-                                # Click time input to open picker
                                 time_input = WebDriverWait(self.driver, 5).until(
-                                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text'][readonly][value*=':']"))
+                                    EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='text'][readonly][value*=':']"))
                                 )
                                 time_input.click()
                                 self._human_delay(0.5, 1)
                                 
-                                # Select hour
-                                hour = dt.strftime('%H')  # 00-23 format
+                                hour = dt.strftime('%H')
                                 hour_option = WebDriverWait(self.driver, 5).until(
                                     EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'tiktok-timepicker-left') and text()='{hour}']"))
                                 )
                                 hour_option.click()
                                 self._human_delay(0.3, 0.6)
                                 
-                                # Select minute (round to nearest 5)
                                 minute = (dt.minute // 5) * 5
                                 minute_str = f"{minute:02d}"
                                 minute_option = WebDriverWait(self.driver, 5).until(
@@ -276,63 +331,45 @@ class TikTokUploader(BasePlatform):
                                 )
                                 minute_option.click()
                                 self._human_delay(0.5, 1)
-                                
-                                print(f"Time set to: {hour}:{minute_str}")
                             except Exception as e:
                                 print(f"Failed to set time: {e}")
                             
                             # Set DATE
                             try:
-                                # Click date input to open calendar
                                 date_input = WebDriverWait(self.driver, 5).until(
-                                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text'][readonly][value*='-']"))
+                                    EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='text'][readonly][value*='-']"))
                                 )
                                 date_input.click()
                                 self._human_delay(0.5, 1)
                                 
-                                # TikTok calendar uses simple span elements with class "day valid"
-                                # Text content is just the day number (1-31)
                                 day_number = str(dt.day)
-                                
-                                # Wait for calendar to be visible
-                                WebDriverWait(self.driver, 3).until(
-                                    EC.presence_of_element_located((By.XPATH, "//span[contains(@class, 'day') and contains(@class, 'valid')]"))
+                                day_element = WebDriverWait(self.driver, 3).until(
+                                    EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'day') and contains(@class, 'valid') and text()='{day_number}']"))
                                 )
-                                
-                                # Click the day
-                                try:
-                                    day_element = WebDriverWait(self.driver, 3).until(
-                                        EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'day') and contains(@class, 'valid') and text()='{day_number}']"))
-                                    )
-                                    day_element.click()
-                                    self._human_delay(0.5, 1)
-                                    print(f"Date set to day: {day_number}")
-                                except Exception as e:
-                                    print(f"Warning: Could not automatically select day {day_number}: {e}")
-                                    print("Please select the date manually.")
-                                    
+                                day_element.click()
+                                self._human_delay(0.5, 1)
                             except Exception as e:
-                                print(f"Failed to open date picker: {e}")
+                                print(f"Failed to set date: {e}")
                     
                 except Exception as e:
                     print(f"Failed to switch to schedule mode: {e}")
 
             # Click post button
             try:
-                # Try multiple selectors for Post/Schedule button
+                # English Strict Selectors
                 post_button = None
+                
+                # Check for "Post" or "Schedule" button texts
                 xpath_selectors = [
                     "//button[contains(., 'Post')]",
                     "//button[div[text()='Post']]",
-                    "//div[text()='Post']/parent::button",
                     "//button[contains(., 'Schedule')]",
-                    "//button[div[text()='Schedule']]",
-                    "//div[text()='Schedule']/parent::button"
+                    "//button[div[text()='Schedule']]"
                 ]
                 
                 for xpath in xpath_selectors:
                     try:
-                        post_button = WebDriverWait(self.driver, 5).until(
+                        post_button = WebDriverWait(self.driver, 2).until(
                             EC.element_to_be_clickable((By.XPATH, xpath))
                         )
                         break
@@ -340,35 +377,32 @@ class TikTokUploader(BasePlatform):
                         continue
                 
                 if not post_button:
-                     # Try CSS selector as fallback
+                     # Fallback to CSS
                      try:
-                        post_button = WebDriverWait(self.driver, 5).until(
+                        post_button = WebDriverWait(self.driver, 2).until(
                             EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-e2e='post_video_button']"))
                         )
                      except:
                         pass
 
                 if post_button:
-                    # Scroll into view to be safe
                     self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
                     self._human_delay()
                     
-
-                    
-                    # Check for DRY_RUN or TEST_MODE
-                    if os.environ.get('DRY_RUN', 'false').lower() == 'true' or os.environ.get('TEST_MODE', 'false').lower() == 'true':
-                        
+                    if os.environ.get('DRY_RUN', 'false').lower() == 'true':
                         print("[DRY RUN] Skipping actual post click")
-                        return UploadResult(
-                            platform=Platform.TIKTOK,
-                            success=True,
-                            url="https://www.tiktok.com/@your_profile (DRY RUN)"
-                        )
-
-                    post_button.click()
+                        return UploadResult(platform=Platform.TIKTOK, success=True, url="DRY RUN")
+                    
+                    # Ensure button is clickable by waiting for overlay to disappear
+                    try:
+                        post_button.click()
+                    except Exception as e:
+                         # Retry logic often helps with "element click intercepted"
+                         print(f"Click intercepted? Retrying via JS... {e}")
+                         self.driver.execute_script("arguments[0].click();", post_button)
+                         
                     self._human_delay(2, 4)
                     
-                    # Wait for upload confirmation
                     time.sleep(5)
                     
                     return UploadResult(
@@ -380,7 +414,7 @@ class TikTokUploader(BasePlatform):
                     return UploadResult(
                         platform=Platform.TIKTOK,
                         success=False,
-                        error="Could not find Post button"
+                        error="Could not find Post/Schedule button"
                     )
             except Exception as e:
                 return UploadResult(
@@ -388,6 +422,12 @@ class TikTokUploader(BasePlatform):
                     success=False,
                     error=f"Failed to click post button: {e}"
                 )
+        except Exception as e:
+            return UploadResult(
+                platform=Platform.TIKTOK,
+                success=False,
+                error=str(e)
+            )
                 
         except Exception as e:
             return UploadResult(

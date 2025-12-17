@@ -215,6 +215,13 @@ class TikTokUploader(BasePlatform):
                             caption_input.send_keys(char)
                             time.sleep(random.uniform(0.05, 0.15))
                         self._human_delay()
+                        
+                        # Dismiss any hashtag/mention suggestion popups by clicking elsewhere
+                        try:
+                            self.driver.execute_script("document.body.click();")
+                            self._human_delay(0.5, 1)
+                        except:
+                            pass
                     else:
                         print("Could not find caption input field")
                 except Exception as e:
@@ -225,58 +232,121 @@ class TikTokUploader(BasePlatform):
             if thumbnail_path and os.path.exists(thumbnail_path):
                 print(f"Uploading thumbnail: {thumbnail_path}")
                 try:
-                    # 1. Click "Edit cover" (Strict English)
+                    # 1. Click "Edit cover"
                     try:
-                        edit_cover_btn = WebDriverWait(self.driver, 5).until(
-                            EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Edit cover')]"))
+                        # User provided class: edit-container
+                        edit_cover_btn = WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, ".edit-container"))
                         )
-                        edit_cover_btn.click()
-                        self._human_delay(1, 2)
+                        self.driver.execute_script("arguments[0].click();", edit_cover_btn)
+                        self._human_delay(2, 3)
                         
-                        # 2. Click "Upload cover" (Strict English)
-                        upload_tab_btn = WebDriverWait(self.driver, 5).until(
-                            EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Upload cover')]"))
+                        # 2. Click "Upload cover" tab
+                        # User provided class: cover-edit-tab
+                        upload_tab_btn = WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'cover-edit-tab') and contains(., 'Upload cover')]"))
                         )
-                        upload_tab_btn.click()
-                        self._human_delay(1, 2)
+                        self.driver.execute_script("arguments[0].click();", upload_tab_btn)
+                        self._human_delay(2, 3)
                         
-                        # 3. Upload file
-                        cover_file_input = WebDriverWait(self.driver, 5).until(
-                            EC.presence_of_element_located((By.XPATH, "//input[@type='file' and @accept='image/*']"))
+                        # 3. Wait for the upload area to signal tab switch
+                        # User provided class: upload-image-upload-area
+                        upload_area = WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, ".upload-image-upload-area"))
                         )
-                        cover_file_input.send_keys(str(Path(thumbnail_path).absolute()))
-                        self._human_delay(3, 5) # Process image
+                        print("Upload cover tab active")
                         
-                        # 4. Click Confirm / Close / X
-                        # Look for "Confirm" button (Strict English)
+                        # 4. Find the file input within the modal/upload area
+                        # There's usually a hidden input inside or near the upload area
                         try:
-                            confirm_btn = WebDriverWait(self.driver, 5).until(
-                                EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Confirm')]"))
-                            )
-                            confirm_btn.click()
+                            cover_file_input = self.driver.find_element(By.XPATH, "//div[contains(@class, 'upload-image-upload-area')]//input[@type='file']")
                         except:
-                            print("Confirm button not found, trying Close icon")
-                            # Fallback to close icon if Confirm doesn't exist
-                            close_btn = WebDriverWait(self.driver, 3).until(
-                                EC.element_to_be_clickable((By.XPATH, "//*[name()='svg' and contains(@class, 'close')]/ancestor::div[1]"))
+                            # Fallback to any image file input if specific one not found
+                            cover_file_input = WebDriverWait(self.driver, 5).until(
+                                EC.presence_of_element_located((By.XPATH, "//input[@type='file' and contains(@accept, 'image')]"))
                             )
-                            close_btn.click()
+                            
+                        cover_file_input.send_keys(str(Path(thumbnail_path).absolute()))
+                        print("Thumbnail file sent, waiting for processing (8-12s)...")
+                        self._human_delay(8, 12) # Process image can take time
+                        
+                        # 5. Click Confirm / Close / X
+                        # User provided button structure: <button class="TUXButton ..."><div ...>Confirm</div></button>
+                        print("Looking for Confirm button...")
+                        
+                        # Re-scan for buttons to ensure they are fresh
+                        confirm_selectors = [
+                            "//button[contains(@class, 'TUXButton') and .//text()='Confirm']", # Target the button itself
+                            "//button[contains(@class, 'TUXButton')]//div[contains(text(), 'Confirm')]/ancestor::button[1]",
+                            "//button[.//text()='Confirm']",
+                            "//button[div[text()='Confirm']]",
+                            "//div[text()='Confirm']"
+                        ]
+                        
+                        clicked_confirm = False
+                        for selector in confirm_selectors:
+                            try:
+                                btn = WebDriverWait(self.driver, 5).until(
+                                    EC.presence_of_element_located((By.XPATH, selector))
+                                )
+                                # Scroll and check visibility
+                                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+                                self._human_delay(1, 2)
+                                
+                                # Check if disabled
+                                is_disabled = btn.get_attribute("aria-disabled") == "true" or btn.get_attribute("disabled")
+                                if is_disabled:
+                                    print("Confirm button is disabled, waiting 5 more seconds...")
+                                    self._human_delay(5, 6)
+                                
+                                try:
+                                    btn.click()
+                                    print(f"Clicked confirm via normal click: {selector}")
+                                except:
+                                    self.driver.execute_script("arguments[0].click();", btn)
+                                    print(f"Clicked confirm via JS: {selector}")
+                                    
+                                clicked_confirm = True
+                                break
+                            except Exception:
+                                continue
+                                
+                        if not clicked_confirm:
+                            print("Confirm button not found or click failed, trying Close icon fallback")
+                            close_selectors = [
+                                "//div[contains(@class, 'jsx-3186560874')]//svg/ancestor::div[1]",
+                                "//*[name()='svg' and contains(@class, 'close')]/ancestor::div[1]"
+                            ]
+                            for selector in close_selectors:
+                                try:
+                                    close_btn = WebDriverWait(self.driver, 3).until(
+                                        EC.element_to_be_clickable((By.XPATH, selector))
+                                    )
+                                    self.driver.execute_script("arguments[0].click();", close_btn)
+                                    print("Clicked close icon fallback")
+                                    break
+                                except:
+                                    continue
                             
                         self._human_delay(2, 3) 
                         
-                        # Wait for modal to disappear completely
+                        # Final check to ensure modal is gone
                         try:
+                            # Wait for modal to disappear completely
                             WebDriverWait(self.driver, 5).until(
                                 EC.invisibility_of_element_located((By.CLASS_NAME, "TUXModal-overlay"))
                             )
+                            print("Modal successfully closed")
                         except:
-                            print("Warning: Modal might still be visible")
+                            print("Modal still visible, forcing ESC")
+                            ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+                            self._human_delay(1, 2)
                             
                     except Exception as e:
-                        print(f"Thumbnail upload logic failed: {e}")
-                        # Ensure we try to close any open modal
+                        print(f"Thumbnail upload sequence failed: {e}")
                         try:
                             ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+                            self._human_delay(1, 2)
                         except:
                             pass
                 except Exception as e:
@@ -311,17 +381,33 @@ class TikTokUploader(BasePlatform):
                             
                             # Set TIME
                             try:
+                                # Ensure no overlays are blocking
+                                try:
+                                    WebDriverWait(self.driver, 5).until(
+                                        EC.invisibility_of_element_located((By.CLASS_NAME, "TUXModal-overlay"))
+                                    )
+                                except:
+                                    pass
+
                                 time_input = WebDriverWait(self.driver, 5).until(
                                     EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='text'][readonly][value*=':']"))
                                 )
-                                time_input.click()
+                                try:
+                                    time_input.click()
+                                except:
+                                    self.driver.execute_script("arguments[0].click();", time_input)
+                                    
                                 self._human_delay(0.5, 1)
                                 
                                 hour = dt.strftime('%H')
                                 hour_option = WebDriverWait(self.driver, 5).until(
                                     EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'tiktok-timepicker-left') and text()='{hour}']"))
                                 )
-                                hour_option.click()
+                                try:
+                                    hour_option.click()
+                                except:
+                                    self.driver.execute_script("arguments[0].click();", hour_option)
+                                    
                                 self._human_delay(0.3, 0.6)
                                 
                                 minute = (dt.minute // 5) * 5
@@ -329,7 +415,11 @@ class TikTokUploader(BasePlatform):
                                 minute_option = WebDriverWait(self.driver, 5).until(
                                     EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'tiktok-timepicker-right') and text()='{minute_str}']"))
                                 )
-                                minute_option.click()
+                                try:
+                                    minute_option.click()
+                                except:
+                                    self.driver.execute_script("arguments[0].click();", minute_option)
+                                    
                                 self._human_delay(0.5, 1)
                             except Exception as e:
                                 print(f"Failed to set time: {e}")
@@ -339,14 +429,22 @@ class TikTokUploader(BasePlatform):
                                 date_input = WebDriverWait(self.driver, 5).until(
                                     EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='text'][readonly][value*='-']"))
                                 )
-                                date_input.click()
+                                try:
+                                    date_input.click()
+                                except:
+                                    self.driver.execute_script("arguments[0].click();", date_input)
+                                    
                                 self._human_delay(0.5, 1)
                                 
                                 day_number = str(dt.day)
                                 day_element = WebDriverWait(self.driver, 3).until(
                                     EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'day') and contains(@class, 'valid') and text()='{day_number}']"))
                                 )
-                                day_element.click()
+                                try:
+                                    day_element.click()
+                                except:
+                                    self.driver.execute_script("arguments[0].click();", day_element)
+                                    
                                 self._human_delay(0.5, 1)
                             except Exception as e:
                                 print(f"Failed to set date: {e}")

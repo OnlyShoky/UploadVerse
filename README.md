@@ -121,6 +121,12 @@ Given these files:
 Run:
 ```bash
 video-publisher upload vids/clip1.mp4 vids/clip2.mp4 vids/clip3.mp4 --platforms tiktok
+
+video-publisher upload video1.mp4 video2.mp4 --platforms tiktok \
+  --metadata "meta1.json,meta2.json" \
+  --thumbnail "thumb1.jpg,thumb2.jpg"
+
+video-publisher upload .\data\videos\112_es_vertical.mp4 .\data\videos\112_es_vertical.mp4 --platforms tiktok --metadata ".\data\videos\112_es_horizontal.json,.\data\videos\112_es_horizontal2.json" --thumbnail ".\data\videos\thumb_114_en_1.jpg,.\data\videos\thumb_114_en_2.jpg"
 ```
 
 **What happens:**

@@ -225,22 +225,43 @@ class TikTokUploader(BasePlatform):
                         caption_input.send_keys(Keys.DELETE)
                         self._human_delay(0.5, 1)
                         
-                        # Type caption using JavaScript to avoid special character issues
-                        # Characters like [ and ] can cause problems with send_keys
+                        # Type caption using clipboard paste for React/Draft.js compatibility
+                        # This properly triggers React's synthetic events
                         self.driver.execute_script("""
-                            var el = arguments[0];
-                            var text = arguments[1];
-                            el.focus();
-                            // For contenteditable divs
-                            if (el.contentEditable === 'true') {
-                                el.textContent = text;
-                                // Trigger input event for React
-                                el.dispatchEvent(new InputEvent('input', {bubbles: true, data: text}));
-                            } else {
-                                el.value = text;
-                                el.dispatchEvent(new Event('input', {bubbles: true}));
-                            }
+                            // Copy text to clipboard
+                            navigator.clipboard.writeText(arguments[1]).then(function() {
+                                // Focus the element
+                                arguments[0].focus();
+                            });
                         """, caption_input, caption)
+                        self._human_delay(0.5, 1)
+                        
+                        # Paste from clipboard using keyboard shortcut
+                        caption_input.send_keys(Keys.CONTROL + "v")
+                        self._human_delay(1, 2)
+                        
+                        # Fallback: if paste didn't work, try character-by-character
+                        # but escape special characters first
+                        current_text = caption_input.text.strip() if hasattr(caption_input, 'text') else ''
+                        if not current_text:
+                            print("Clipboard paste may have failed, trying direct input...")
+                            # Type each character, escaping special Selenium keys
+                            for char in caption:
+                                if char in '[]{}':
+                                    # These can cause issues, use JS to insert
+                                    self.driver.execute_script(
+                                        "arguments[0].textContent += arguments[1];",
+                                        caption_input, char
+                                    )
+                                else:
+                                    caption_input.send_keys(char)
+                                time.sleep(random.uniform(0.02, 0.08))
+                            # Trigger input event
+                            self.driver.execute_script("""
+                                arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
+                                arguments[0].dispatchEvent(new Event('change', {bubbles: true}));
+                            """, caption_input)
+                        
                         self._human_delay(1, 2)
                         
                         # Dismiss any hashtag/mention suggestion popups by clicking elsewhere

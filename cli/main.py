@@ -37,15 +37,15 @@ def upload(
         "--platforms", "-p",
         help="Comma-separated list of platforms (youtube,tiktok,instagram) or 'all'"
     ),
-    metadata_file: Optional[Path] = typer.Option(
+    metadata: Optional[str] = typer.Option(
         None,
         "--metadata", "-m",
-        help="JSON metadata file (Applied to ALL videos). If not provided, looks for {video}.json"
+        help="JSON metadata file(s). Comma-separated for multiple (paired by position with videos)"
     ),
-    thumbnail_path: Optional[Path] = typer.Option(
+    thumbnails: Optional[str] = typer.Option(
         None,
         "--thumbnail",
-        help="Custom thumbnail image (Applied to ALL videos). If not provided, looks for {video}.jpg/png"
+        help="Custom thumbnail(s). Comma-separated for multiple (paired by position with videos)"
     ),
     title: Optional[str] = typer.Option(None, "--title", "-t", help="Video title (Applied to ALL videos)"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Video description (Applied to ALL videos)"),
@@ -77,8 +77,16 @@ def upload(
             'publish_now': publish_now,
             'scheduled_time': scheduled_time
         }
-    if thumbnail_path:
-        global_cli_metadata['thumbnail_path'] = str(thumbnail_path)
+    # Note: thumbnails is now handled per-video below
+    
+    # Parse comma-separated metadata and thumbnail paths into lists
+    metadata_files = []
+    if metadata:
+        metadata_files = [Path(p.strip()) for p in metadata.split(',') if p.strip()]
+    
+    thumbnail_paths = []
+    if thumbnails:
+        thumbnail_paths = [Path(p.strip()) for p in thumbnails.split(',') if p.strip()]
 
     # Process each video
     total_videos = len(video_paths)
@@ -98,25 +106,38 @@ def upload(
         for index, video_path in enumerate(video_paths, 1):
             console.print(f"\n[bold cyan]Processing [{index}/{total_videos}]:[/bold cyan] {video_path.name}")
             
+            # Determine which metadata file to use for this video
+            # If multiple metadata files provided, pair by position. If only one, use for all.
+            video_metadata_file = None
+            if metadata_files:
+                if len(metadata_files) >= index:
+                    video_metadata_file = metadata_files[index - 1]
+                elif len(metadata_files) == 1:
+                    video_metadata_file = metadata_files[0]
+            
+            # Determine which thumbnail to use for this video
+            video_thumbnail_path = None
+            if thumbnail_paths:
+                if len(thumbnail_paths) >= index:
+                    video_thumbnail_path = thumbnail_paths[index - 1]
+                elif len(thumbnail_paths) == 1:
+                    video_thumbnail_path = thumbnail_paths[0]
+            
             # 1. Determine Metadata
             # Priority: CLI > --metadata file > {video}.json > default template
             current_metadata = {}
             
-            # A. Load from --metadata if provided (global)
-            if metadata_file:
+            # A. Load from --metadata if provided for this video
+            if video_metadata_file:
                 try:
-                    current_metadata = import_metadata(str(metadata_file))
-                    console.print(f"  [dim]• Loaded global metadata: {metadata_file.name}[/dim]")
+                    current_metadata = import_metadata(str(video_metadata_file))
+                    console.print(f"  [dim]• Loaded metadata: {video_metadata_file.name}[/dim]")
                 except Exception as e:
-                    console.print(f"  [bold red]❌ Error loading global metadata:[/bold red] {e}")
-                    continue # Skip this video? Or fail? Let's skip.
+                    console.print(f"  [bold red]❌ Error loading metadata:[/bold red] {e}")
+                    continue
 
-            # B. Auto-detect {video}.json if no global metadata file OR to supplement?
-            # Usually strict: if global is given, use it. If not, look for local.
-            # But let's allow local to override global? Or global to override local?
-            # Plan says: "Explicitly provided --metadata file (applies to ALL videos)"
-            # So if NOT provided, check for local.
-            elif not metadata_file:
+            # B. Auto-detect {video}.json if no metadata file provided
+            elif not video_metadata_file:
                 possible_json = video_path.with_suffix('.json')
                 if possible_json.exists():
                     try:
@@ -125,8 +146,11 @@ def upload(
                     except Exception as e:
                         console.print(f"  [red]⚠ Error loading local metadata: {e}[/red]")
 
-            # C. Auto-detect thumbnail if not provided globally
-            if not thumbnail_path:
+            # C. Use provided thumbnail or auto-detect
+            if video_thumbnail_path:
+                current_metadata['thumbnail_path'] = str(video_thumbnail_path)
+                console.print(f"  [dim]• Using thumbnail: {video_thumbnail_path.name}[/dim]")
+            else:
                 # Check for same name with typical image extensions
                 for ext in ['.jpg', '.jpeg', '.png']:
                     possible_thumb = video_path.with_suffix(ext)

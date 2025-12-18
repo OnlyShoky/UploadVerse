@@ -146,27 +146,42 @@ class TikTokUploader(BasePlatform):
         if not self.is_authenticated():
             self.authenticate()
         
+        # Maximize for better element targeting
+        try:
+            self.driver.maximize_window()
+        except:
+            pass
+
         try:
             # Navigate to upload page (EN)
             self.driver.get('https://www.tiktok.com/upload?lang=en')
-            self._human_delay(2, 4)
+            print("Navigating to TikTok upload page...")
+            self._human_delay(5, 8)
             
             # Find and interact with file input
             try:
-                # Find the file input - standard timeout
-                file_input = WebDriverWait(self.driver, 10).until(
+                # First ensure "Select video" button or specific text is present to confirm page load
+                try:
+                    WebDriverWait(self.driver, 15).until(
+                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Select video to upload')]"))
+                    )
+                except:
+                    print("Warning: 'Select video' text not found, proceeding anyway...")
+
+                # Find the file input - increased timeout for slow loads
+                file_input = WebDriverWait(self.driver, 60).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
                 )
             except TimeoutException:
                  return UploadResult(
                     platform=Platform.TIKTOK,
                     success=False,
-                    error="Timeout waiting for upload area"
+                    error="Timeout waiting for upload area (file input not found after 60s)"
                 )
             
             # Upload file
             file_input.send_keys(str(Path(video_path).absolute()))
-            self._human_delay(3, 5)
+            self._human_delay(5, 8)
             
             # Wait for video to process
             print("Waiting for video to process...")
@@ -210,11 +225,23 @@ class TikTokUploader(BasePlatform):
                         caption_input.send_keys(Keys.DELETE)
                         self._human_delay(0.5, 1)
                         
-                        # Type caption
-                        for char in caption:
-                            caption_input.send_keys(char)
-                            time.sleep(random.uniform(0.05, 0.15))
-                        self._human_delay()
+                        # Type caption using JavaScript to avoid special character issues
+                        # Characters like [ and ] can cause problems with send_keys
+                        self.driver.execute_script("""
+                            var el = arguments[0];
+                            var text = arguments[1];
+                            el.focus();
+                            // For contenteditable divs
+                            if (el.contentEditable === 'true') {
+                                el.textContent = text;
+                                // Trigger input event for React
+                                el.dispatchEvent(new InputEvent('input', {bubbles: true, data: text}));
+                            } else {
+                                el.value = text;
+                                el.dispatchEvent(new Event('input', {bubbles: true}));
+                            }
+                        """, caption_input, caption)
+                        self._human_delay(1, 2)
                         
                         # Dismiss any hashtag/mention suggestion popups by clicking elsewhere
                         try:
@@ -267,73 +294,70 @@ class TikTokUploader(BasePlatform):
                             )
                             
                         cover_file_input.send_keys(str(Path(thumbnail_path).absolute()))
-                        print("Thumbnail file sent, waiting for processing (8-12s)...")
-                        self._human_delay(8, 12) # Process image can take time
+                        print("Thumbnail file sent, waiting for processing (12-15s)...")
+                        self._human_delay(12, 15)
                         
-                        # 5. Click Confirm / Close / X
-                        # User provided button structure: <button class="TUXButton ..."><div ...>Confirm</div></button>
-                        print("Looking for Confirm button...")
+                        # 5. Wait for image preview to appear (confirms image is loaded)
+                        try:
+                            WebDriverWait(self.driver, 15).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, ".upload-image-cover-viewer-container"))
+                            )
+                            print("Image preview loaded")
+                        except:
+                            print("Warning: Image preview not detected, proceeding anyway")
                         
-                        # Re-scan for buttons to ensure they are fresh
+                        # 6. Click Confirm button
+                        # IMPORTANT: There are TWO cover-edit-footer elements!
+                        # - First one: in jsx-623769667 (for "Select cover" tab) - WRONG
+                        # - Second one: in jsx-2328539565 (for "Upload cover" tab) - CORRECT
+                        # The correct one has "Upload new" button as sibling to "Confirm"
+                        print("Looking for Confirm button in Upload cover footer...")
+                        
                         confirm_selectors = [
-                            "//button[contains(@class, 'TUXButton') and .//text()='Confirm']", # Target the button itself
-                            "//button[contains(@class, 'TUXButton')]//div[contains(text(), 'Confirm')]/ancestor::button[1]",
-                            "//button[.//text()='Confirm']",
-                            "//button[div[text()='Confirm']]",
-                            "//div[text()='Confirm']"
+                            # Working selector: button next to "Upload new" button
+                            "//button[.//div[text()='Upload new']]/following-sibling::button[contains(@class, 'TUXButton--primary')]"
                         ]
                         
+                        
                         clicked_confirm = False
-                        for selector in confirm_selectors:
-                            try:
-                                btn = WebDriverWait(self.driver, 5).until(
-                                    EC.presence_of_element_located((By.XPATH, selector))
-                                )
-                                # Scroll and check visibility
+                        try:
+                            print("Looking for Confirm button...")
+                            btn = WebDriverWait(self.driver, 10).until(
+                                EC.presence_of_element_located((By.XPATH, confirm_selectors[0]))
+                            )
+                            
+                            if not btn.is_displayed():
+                                print("Confirm button found but not visible")
+                            else:
+                                print("Found visible Confirm button")
                                 self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
-                                self._human_delay(1, 2)
+                                self._human_delay(0.5, 1)
                                 
                                 # Check if disabled
-                                is_disabled = btn.get_attribute("aria-disabled") == "true" or btn.get_attribute("disabled")
-                                if is_disabled:
-                                    print("Confirm button is disabled, waiting 5 more seconds...")
+                                if btn.get_attribute("aria-disabled") == "true":
+                                    print("Button disabled, waiting 5s...")
                                     self._human_delay(5, 6)
                                 
+                                # Try standard click, fallback to JS
                                 try:
                                     btn.click()
-                                    print(f"Clicked confirm via normal click: {selector}")
-                                except:
+                                    print("✓ Clicked via standard click")
+                                    clicked_confirm = True
+                                except Exception as e:
+                                    print(f"Standard click failed, trying JS: {e}")
                                     self.driver.execute_script("arguments[0].click();", btn)
-                                    print(f"Clicked confirm via JS: {selector}")
+                                    print("✓ Clicked via JS")
+                                    clicked_confirm = True
                                     
-                                clicked_confirm = True
-                                break
-                            except Exception:
-                                continue
-                                
-                        if not clicked_confirm:
-                            print("Confirm button not found or click failed, trying Close icon fallback")
-                            close_selectors = [
-                                "//div[contains(@class, 'jsx-3186560874')]//svg/ancestor::div[1]",
-                                "//*[name()='svg' and contains(@class, 'close')]/ancestor::div[1]"
-                            ]
-                            for selector in close_selectors:
-                                try:
-                                    close_btn = WebDriverWait(self.driver, 3).until(
-                                        EC.element_to_be_clickable((By.XPATH, selector))
-                                    )
-                                    self.driver.execute_script("arguments[0].click();", close_btn)
-                                    print("Clicked close icon fallback")
-                                    break
-                                except:
-                                    continue
+                                self._human_delay(2, 3)
+                        except Exception as e:
+                            print(f"Confirm button failed: {str(e)[:50]}")
                             
                         self._human_delay(2, 3) 
                         
-                        # Final check to ensure modal is gone
+                        # Ensure modal is gone
                         try:
-                            # Wait for modal to disappear completely
-                            WebDriverWait(self.driver, 5).until(
+                            WebDriverWait(self.driver, 10).until(
                                 EC.invisibility_of_element_located((By.CLASS_NAME, "TUXModal-overlay"))
                             )
                             print("Modal successfully closed")
@@ -341,7 +365,7 @@ class TikTokUploader(BasePlatform):
                             print("Modal still visible, forcing ESC")
                             ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
                             self._human_delay(1, 2)
-                            
+                                
                     except Exception as e:
                         print(f"Thumbnail upload sequence failed: {e}")
                         try:
@@ -397,28 +421,52 @@ class TikTokUploader(BasePlatform):
                                 except:
                                     self.driver.execute_script("arguments[0].click();", time_input)
                                     
-                                self._human_delay(0.5, 1)
+                                self._human_delay(1, 2)
                                 
                                 hour = dt.strftime('%H')
-                                hour_option = WebDriverWait(self.driver, 5).until(
-                                    EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'tiktok-timepicker-left') and text()='{hour}']"))
-                                )
-                                try:
-                                    hour_option.click()
-                                except:
-                                    self.driver.execute_script("arguments[0].click();", hour_option)
-                                    
-                                self._human_delay(0.3, 0.6)
-                                
                                 minute = (dt.minute // 5) * 5
                                 minute_str = f"{minute:02d}"
-                                minute_option = WebDriverWait(self.driver, 5).until(
-                                    EC.element_to_be_clickable((By.XPATH, f"//span[contains(@class, 'tiktok-timepicker-right') and text()='{minute_str}']"))
-                                )
+                                
+                                # Find hour option using exact TikTok class names
+                                # The element exists but may be hidden by scroll container
+                                hour_selector = f"//span[contains(@class, 'tiktok-timepicker-left') and text()='{hour}']"
+                                
                                 try:
-                                    minute_option.click()
-                                except:
+                                    hour_option = self.driver.find_element(By.XPATH, hour_selector)
+                                    # Scroll the parent container to bring element into view
+                                    self.driver.execute_script("""
+                                        var el = arguments[0];
+                                        var container = el.closest('.tiktok-timepicker-time-scroll-container');
+                                        if (container) {
+                                            container.scrollTop = el.offsetTop - container.offsetHeight / 2;
+                                        }
+                                    """, hour_option)
+                                    self._human_delay(0.5, 1)
+                                    self.driver.execute_script("arguments[0].click();", hour_option)
+                                    print(f"Selected hour: {hour}")
+                                except Exception as e:
+                                    print(f"Warning: Could not find/click hour {hour}: {e}")
+                                    
+                                self._human_delay(0.5, 1)
+                                
+                                # Find minute option using exact TikTok class names
+                                minute_selector = f"//span[contains(@class, 'tiktok-timepicker-right') and text()='{minute_str}']"
+                                
+                                try:
+                                    minute_option = self.driver.find_element(By.XPATH, minute_selector)
+                                    # Scroll the parent container to bring element into view
+                                    self.driver.execute_script("""
+                                        var el = arguments[0];
+                                        var container = el.closest('.tiktok-timepicker-time-scroll-container');
+                                        if (container) {
+                                            container.scrollTop = el.offsetTop - container.offsetHeight / 2;
+                                        }
+                                    """, minute_option)
+                                    self._human_delay(0.5, 1)
                                     self.driver.execute_script("arguments[0].click();", minute_option)
+                                    print(f"Selected minute: {minute_str}")
+                                except Exception as e:
+                                    print(f"Warning: Could not find/click minute {minute_str}: {e}")
                                     
                                 self._human_delay(0.5, 1)
                             except Exception as e:
@@ -457,12 +505,13 @@ class TikTokUploader(BasePlatform):
                 # English Strict Selectors
                 post_button = None
                 
-                # Check for "Post" or "Schedule" button texts
+                # Check for "Post" or "Schedule" button using data-e2e attribute first (most reliable)
+                # When scheduling is enabled, the button text changes from "Post" to "Schedule"
                 xpath_selectors = [
-                    "//button[contains(., 'Post')]",
-                    "//button[div[text()='Post']]",
-                    "//button[contains(., 'Schedule')]",
-                    "//button[div[text()='Schedule']]"
+                    "//button[@data-e2e='post_video_button']",
+                    "//button[.//div[text()='Schedule']]",
+                    "//button[.//div[text()='Post']]",
+                    "//button[contains(@class, 'Button__root--type-primary')]"
                 ]
                 
                 for xpath in xpath_selectors:
@@ -487,8 +536,8 @@ class TikTokUploader(BasePlatform):
                     self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
                     self._human_delay()
                     
-                    if os.environ.get('DRY_RUN', 'false').lower() == 'true':
-                        print("[DRY RUN] Skipping actual post click")
+                    if os.environ.get('DRY_RUN', 'false').lower() == 'true' or os.environ.get('TEST_MODE', 'false').lower() == 'true':
+                        print("[DRY RUN / TEST MODE] Skipping actual post/schedule click")
                         return UploadResult(platform=Platform.TIKTOK, success=True, url="DRY RUN")
                     
                     # Ensure button is clickable by waiting for overlay to disappear

@@ -415,18 +415,96 @@ class InstagramUploader(BasePlatform):
             print("Clicking Next...")
             try:
                 next_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and .//text()='Siguiente']"))
+                    EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and (.//text()='Siguiente' or .//text()='Next')]"))
                 )
                 next_button.click()
                 self._human_delay(2, 3)
             except Exception as e:
                 print(f"Could not find first Next button: {e}")
             
-            # Click Next button again (filters/editing page)
+            # Handle Thumbnail Upload (if provided)
+            thumbnail_path = metadata.get('thumbnail_path')
+            if thumbnail_path and os.path.exists(thumbnail_path):
+                print(f"Attempting to upload thumbnail: {thumbnail_path}")
+                try:
+                    # After first Next, we are in the Edit/Filters page or Cover page
+                    # Look for "Seleccionar desde la computadora" or "Select from computer"
+                    # The user says it appears after clicking Next from dimensions
+                    
+                    # Try to find the "Select from computer" button
+                    thumb_select_btn = None
+                    try:
+                        # Priority 1: Text-based (Locale independent if both are provided)
+                        thumb_select_btn = WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, "//div[@role='button' and (text()='Seleccionar desde la computadora' or text()='Select from computer')]"))
+                        )
+                    except:
+                        # Priority 2: Use the specific classes provided by the user as a fallback
+                        try:
+                            # Use a subset of classes to avoid brittle selector if some change
+                            user_classes = "x1i10hfl xjqpnuy xc5r6h4 xqeqjp1 x1phubyo xdl72j9 x2lah0s x3ct3a4 xdj266r x14z9mp xat24cr x1lziwak x2lwn1j xeuugli x1hl2dhg xggy1nq x1ja2u2z x1t137rt x1q0g3np x1a2a7pz x6s0dn4 xjyslct x1ejq31n x18oe1m7 x1sy0etr xstzfhl x9f619 x1ypdohk x1f6kntn xl56j7k x17ydfre x2b8uid xlyipyv x87ps6o x14atkfc x5c86q x18br7mf x1i0vuye xl0gqc1 xr5sc7 xlal1re x14jxsvd xt0b8zv xjbqb8w xr9e8f9 x1e4oeot x1ui04y5 x6en5u8 x972fbf x10w94by x1qhh985 x14e42zd xt0psk2 xt7dq6l xexx8yu xyri2b x18d9i69 x1c1uobl x1n2onr6 x1n5bzlp"
+                            # We can try to find by a unique combination of classes or the full string
+                            thumb_select_btn = WebDriverWait(self.driver, 5).until(
+                                EC.presence_of_element_located((By.XPATH, f"//div[@role='button' and contains(@class, 'x1i10hfl') and contains(@class, 'x1n5bzlp')]"))
+                            )
+                        except:
+                            # Priority 3: Contains text
+                            try:
+                                thumb_select_btn = WebDriverWait(self.driver, 5).until(
+                                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Select from computer') or contains(text(), 'Seleccionar desde la computadora')]"))
+                                )
+                            except:
+                                pass
+                    
+                    if thumb_select_btn:
+                        print("Found 'Select from computer' button for thumbnail")
+                        self.driver.execute_script("arguments[0].click();", thumb_select_btn)
+                        self._human_delay(2, 3)
+                        
+                        # Find the file input for the thumbnail
+                        # Usually there's a file input that appears or is made active
+                        try:
+                            thumb_input = WebDriverWait(self.driver, 10).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
+                            )
+                            thumb_input.send_keys(str(Path(thumbnail_path).absolute()))
+                            print("Thumbnail file sent, waiting for processing...")
+                            self._human_delay(5, 8)
+                        except Exception as e:
+                            print(f"Failed to send thumbnail keys: {e}")
+                    else:
+                        print("Could not find thumbnail selection button directly, checking for 'Portada' (Cover) tab...")
+                        # Sometimes we need to click "Portada" or "Cover" tab first
+                        try:
+                            cover_tab = WebDriverWait(self.driver, 5).until(
+                                EC.element_to_be_clickable((By.XPATH, "//span[text()='Portada' or text()='Cover']"))
+                            )
+                            cover_tab.click()
+                            self._human_delay(1, 2)
+                            
+                            # Try again for the select button
+                            thumb_select_btn = WebDriverWait(self.driver, 5).until(
+                                EC.presence_of_element_located((By.XPATH, "//div[@role='button' and (text()='Seleccionar desde la computadora' or text()='Select from computer')]"))
+                            )
+                            self.driver.execute_script("arguments[0].click();", thumb_select_btn)
+                            self._human_delay(2, 3)
+                            
+                            thumb_input = WebDriverWait(self.driver, 5).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
+                            )
+                            thumb_input.send_keys(str(Path(thumbnail_path).absolute()))
+                            print("Thumbnail file sent after clicking Cover tab")
+                            self._human_delay(5, 8)
+                        except:
+                             print("Thumbnail selection button not found even after checking Cover tab")
+                except Exception as e:
+                    print(f"Error during thumbnail upload: {e}")
+
+            # Click Next button again (filters/editing page or after thumbnail)
             print("Clicking Next again...")
             try:
                 next_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and .//text()='Siguiente']"))
+                    EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and (.//text()='Siguiente' or .//text()='Next')]"))
                 )
                 next_button.click()
                 self._human_delay(2, 3)

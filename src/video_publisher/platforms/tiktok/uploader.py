@@ -570,6 +570,21 @@ class TikTokUploader(BasePlatform):
                          self.driver.execute_script("arguments[0].click();", post_button)
                          
                     self._human_delay(2, 4)
+
+                    # Handle "Continue to post?" modal if it appears
+                    try:
+                        print("Checking for 'Continue to post?' modal...")
+                        post_now_btn = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, "//button[.//div[text()='Post now']]"))
+                        )
+                        print("Detected 'Continue to post?' modal. Clicking 'Post now'...")
+                        self.driver.execute_script("arguments[0].click();", post_now_btn)
+                        self._human_delay(1, 2)
+                    except TimeoutException:
+                        # No modal appeared, which is normal in most cases
+                        pass
+                    except Exception as e:
+                        print(f"Error handling 'Continue to post?' modal: {e}")
                     
                     time.sleep(5)
                     

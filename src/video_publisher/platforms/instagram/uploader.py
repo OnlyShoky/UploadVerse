@@ -692,7 +692,18 @@ class InstagramUploader(BasePlatform):
                 
                 if confirmed:
                     print("✅ Upload verified successfully!")
-                    self._human_delay(2, 3)
+                    
+                    # Click "Done" or "Listo" to clear the dialog for the next upload
+                    try:
+                        done_btns = self.driver.find_elements(By.XPATH, "//div[@role='button']//p[text()='Done' or text()='Listo']")
+                        if done_btns:
+                            done_btns[0].click()
+                            print("Clicked 'Done' to close confirmation dialog")
+                            self._human_delay(1, 2)
+                    except:
+                        pass
+                        
+                    self._human_delay(1, 2)
                 elif error_detected:
                     return UploadResult(
                         platform=Platform.INSTAGRAM,
@@ -718,9 +729,19 @@ class InstagramUploader(BasePlatform):
                 error=f"Instagram upload failed: {e}"
             )
         finally:
-            self.close()
+            # DO NOT close driver here to allow browser reuse for batch uploads
+            # engine.py or get_publisher handles the singleton/persistent instance
+            pass
+
+    def __del__(self):
+        """Final cleanup on deletion."""
+        self.close()
 
     def close(self):
         """Close the browser."""
         if self.driver:
-            self.driver.quit()
+            try:
+                self.driver.quit()
+            except:
+                pass
+            self.driver = None

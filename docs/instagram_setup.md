@@ -12,16 +12,16 @@
 
 Add to `.env`:
 ```bash
-INSTAGRAM_USERNAME=your_test_username
-INSTAGRAM_PASSWORD=your_test_password
-INSTAGRAM_HEADLESS=false  # Must be false for 2FA/CAPTCHA
+# Global Browser Settings (recommended)
+HEADLESS=true
 ```
 
 ## Authenticate
 
 ```bash
 # Using CLI
-video-publisher auth instagram
+# NOTE: Use --no-headless for initial login to solve CAPTCHAs
+video-publisher auth instagram --no-headless
 ```
 
 **What happens:**

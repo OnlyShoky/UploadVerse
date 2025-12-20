@@ -6,7 +6,7 @@
 
 ### `video-publisher upload`
 
-Upload a video to platforms.
+Upload one or more videos to platforms.
 
 ```bash
 # Auto-detect platform based on aspect ratio
@@ -14,27 +14,26 @@ video-publisher upload video.mp4
 
 # Specify platform
 video-publisher upload video.mp4 --platforms youtube
-video-publisher upload video.mp4 --platforms tiktok
-video-publisher upload video.mp4 --platforms instagram
+video-publisher upload video.mp4 --platforms tiktok,instagram
 
-# Multiple platforms
-video-publisher upload video.mp4 --platforms youtube,tiktok
-
-# With metadata
+# With thumbnail and metadata
 video-publisher upload video.mp4 \
-  --platforms youtube \
-  --title "My Video" \
-  --description "Video description" \
-  --tags "tag1,tag2,tag3"
+  --platforms instagram \
+  --thumbnail cover.jpg \
+  --metadata metadata.json
+
+# Batch upload (all in one browser session)
+video-publisher upload vids/*.mp4 --platforms tiktok
 ```
 
 **Options:**
-- `--platforms`, `-p`: Comma-separated platforms or 'all'
-- `--title`, `-t`: Video title
-- `--description`, `-d`: Video description  
-- `--tags`: Comma-separated tags
-- `--publish-now`: Publish immediately (overrides scheduling)
-- `--scheduled-time`: Schedule publication (ISO 8601 format, e.g., "2025-12-25T10:00:00")
+- `--platforms`, `-p`: Comma-separated platforms (`youtube`, `tiktok`, `instagram`) or `all`.
+- `--metadata`, `-m`: Path to a `.json` file or a comma-separated list of files for batch mapping.
+- `--thumbnail`: Path to a `.jpg`/`.png` file or a comma-separated list for batch mapping.
+- `--headless` / `--no-headless`: Run browser in background (default) or visible.
+- `--publish-now`: Publish immediately (overrides scheduling).
+- `--scheduled-time`: Schedule publication (ISO 8601 format, e.g., "2025-12-25T10:00:00").
+- `--dry-run`: Simulate the upload process without actually clicking the final "Post" button.
 
 ---
 
@@ -51,140 +50,76 @@ video-publisher metadata export \
   --title "My Video" \
   --description "Description" \
   --output metadata.json
-
-# Validate metadata file
-video-publisher metadata validate --input metadata.json
 ```
-
-**Options:**
-- `--output`, `-o`: Output file path
-- `--input`, `-i`: Input file path (for validate)
-- `--title`, `-t`: Video title
-- `--description`, `-d`: Video description
-- `--tags`: Comma-separated tags
-- `--publish-now`: Publish immediately
-- `--scheduled-time`: Schedule publication time
 
 ---
 
 ### `video-publisher auth`
 
-Authenticate with a platform.
+Authenticate with a platform to save persistent sessions.
 
 ```bash
-# YouTube
 video-publisher auth youtube
-
-# TikTok
 video-publisher auth tiktok
-
-# Instagram
 video-publisher auth instagram
 ```
-
-**What it does:**
-- Opens browser for authentication
-- Saves session/tokens to `data/sessions/`
 
 ---
 
 ### `video-publisher status`
 
-Show platform authentication status and rate limits.
+Show authentication status, daily usage, and rate limits.
 
 ```bash
 video-publisher status
 ```
 
-**Output shows:**
-- Authentication status for each platform
-- Daily upload usage
-- Remaining uploads
+---
+
+## 🚀 Advanced Usage & Batching
+
+### 1. Batch Upload (Session Reuse)
+When uploading multiple videos, the tool reuses the same browser instance for **TikTok** and **Instagram**. This avoids repeated logins and significantly speeds up the process.
+
+```bash
+# Upload 3 videos to TikTok in one session
+video-publisher upload vid1.mp4 vid2.mp4 vid3.mp4 --platforms tiktok
+```
+
+### 2. Auto-Discovery
+If you don't provide `--metadata` or `--thumbnail`, the tool looks for files with the **same basename** as the video:
+- `video1.mp4` → Looks for `video1.json` and `video1.jpg`.
+
+### 3. Explicit Mapping
+For more control, provide comma-separated lists. They are matched by order:
+```bash
+video-publisher upload v1.mp4 v2.mp4 \
+  --metadata "m1.json,m2.json" \
+  --thumbnail "t1.jpg,t2.jpg"
+```
+
+### 4. Headless vs Headful
+By default, browser-based platforms (TikTok/Instagram) run in **headless** mode (hidden).
+- If you need to solve a CAPTCHA or want to watch the process:
+```bash
+video-publisher upload video.mp4 --no-headless
+```
+- You can change the default in your `.env` file: `HEADLESS=false`.
 
 ---
 
-### `video-publisher version`
+## Platform Specifics
 
-Show version information.
-
-```bash
-video-publisher version
-```
-
----
-
-## Usage Examples
-
-### First Time Setup
-
-```bash
-# 1. Install
-pip install -e .
-
-# 2. Authenticate YouTube
-video-publisher auth youtube
-
-# 3. Check status
-video-publisher status
-
-# 4. Upload
-video-publisher upload my_video.mp4 --platforms youtube
-```
-
-### Upload to Multiple Platforms
-
-```bash
-# Authenticate each platform first
-video-publisher auth youtube
-video-publisher auth tiktok
-
-# Upload to both
-video-publisher upload video.mp4 --platforms youtube,tiktok
-```
-
-### Auto-Detection
-
-```bash
-# 16:9 video → Auto routes to YouTube
-video-publisher upload horizontal.mp4
-
-# 9:16 video → Auto routes to TikTok, Instagram
-video-publisher upload vertical.mp4
-```
+| Platform | Authentication | Features Supported |
+|----------|----------------|---------------------|
+| **YouTube** | Official OAuth2 | Title, Desc, Tags, Scheduling |
+| **TikTok** | Browser Session | Caption, Tags, Thumbnail, Scheduling |
+| **Instagram** | Browser Session | Caption, Tags, Thumbnail, Crop |
 
 ---
 
-## Platform-Specific Notes
+## 🔧 Troubleshooting
 
-**YouTube:**
-- Uses official API
-- Safe and reliable
-- Supports title, description, tags
-
-**TikTok:**
-- Browser automation
-- Violates TOS
-- May require solving CAPTCHAs
-- Use test accounts only
-
-**Instagram:**
-- Browser automation
-- Violates TOS
-- High ban risk
-- Requires 9:16 vertical videos
-- Use test accounts only
-
----
-
-## Error Handling
-
-If upload fails, check:
-1. Authentication: `video-publisher status`
-2. Video format (must be .mp4, .mov, .avi, etc.)
-3. Internet connection
-4. Platform rate limits
-
-Re-authenticate if needed:
-```bash
-video-publisher auth youtube  # or tiktok/instagram
-```
+1. **Authentication Expired**: run `video-publisher auth <platform>` again.
+2. **Crop Issues (Instagram)**: Instagram sometimes requires manual selection if the auto-crop fails. Use `--no-headless` to see what's happening.
+3. **Rate Limits**: Check `video-publisher status` to see if you've hit platform limits for the day.

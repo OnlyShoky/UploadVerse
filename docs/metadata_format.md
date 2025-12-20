@@ -11,10 +11,9 @@ Complete specification for video metadata JSON files used by UploadVerse.
   "title": "string",
   "description": "string",
   "tags": ["array", "of", "strings"],
+  "thumbnail_path": "string (optional)",
   "playlist_id": "string (YouTube only)",
   "category_id": "string (YouTube only)",
-  "language": "string (ISO 639-1)",
-  "privacy_status": "public|private|unlisted",
   "language": "string (ISO 639-1)",
   "privacy_status": "public|private|unlisted",
   "metadata_generated_at": "ISO 8601 timestamp",
@@ -129,15 +128,15 @@ Listen and memorize the complete recitation..."
     "USA",
     "UK"
   ],
+  "thumbnail_path": "data/videos/video1.jpg",
   "playlist_id": "PLR1ei1r7x7pEsxKz2omWk7hWvRemeWcIC",
   "category_id": "10",
   "language": "en",
   "privacy_status": "public",
-  "privacy_status": "public",
   "metadata_generated_at": "2025-12-02T19:12:32.767512+00:00",
   "scheduling": {
     "publish_now": false,
-    "scheduled_time": "2025-12-25T10:00:00Z"
+    "scheduled_time": "ISO 8601 timestamp (optional)"
   }
 }
 ```

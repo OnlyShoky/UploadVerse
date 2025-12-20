@@ -11,16 +11,16 @@
 
 Add to `.env`:
 ```bash
-TIKTOK_USERNAME=your_test_username
-TIKTOK_PASSWORD=your_test_password  # Optional, for programmatic login
-TIKTOK_HEADLESS=false  # Keep false to see browser for CAPTCHA solving
+# Global Browser Settings (recommended)
+HEADLESS=true
 ```
 
 ## Authenticate
 
 ```bash
 # Using CLI
-video-publisher auth tiktok
+# NOTE: Use --no-headless for initial login to solve CAPTCHAs
+video-publisher auth tiktok --no-headless
 ```
 
 **What happens:**

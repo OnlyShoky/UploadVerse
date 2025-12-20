@@ -56,11 +56,9 @@ Create `.env` file:
 # YouTube (safe, recommended)
 YOUTUBE_CLIENT_SECRETS_FILE=client_secrets.json
 
-# TikTok (⚠️ use test accounts only)
-TIKTOK_HEADLESS=false
-
-# Instagram (🔴 high ban risk, use test accounts only)
-INSTAGRAM_HEADLESS=false
+# Global Browser Settings
+# Set to 'true' to run without a visible browser window (default)
+HEADLESS=true
 ```
 
 ---
@@ -98,15 +96,14 @@ video-publisher upload video.mp4 --platforms tiktok
 
 ### Advanced Features
 ```bash
-# Custom Thumbnail
-video-publisher upload video.mp4 --platforms tiktok --thumbnail cover.jpg
-
-# With simple metadata
+# With custom thumbnail and metadata
 video-publisher upload video.mp4 \
-  --platforms youtube \
-  --title "My Video" \
-  --description "Description" \
-  --tags "tag1,tag2"
+  --platforms tiktok \
+  --thumbnail cover.jpg \
+  --metadata metadata.json
+
+# Run with visible browser (override default headless)
+video-publisher upload video.mp4 --no-headless
 ```
 
 ### Batch Upload & Auto-Discovery
@@ -120,13 +117,13 @@ Given these files:
 
 Run:
 ```bash
-video-publisher upload vids/clip1.mp4 vids/clip2.mp4 vids/clip3.mp4 --platforms tiktok
+# Batch upload using auto-discovery (detects .json and .jpg with same name)
+video-publisher upload vids/*.mp4 --platforms tiktok
 
+# Explicit batch upload with mapped metadata and thumbnails
 video-publisher upload video1.mp4 video2.mp4 --platforms tiktok \
   --metadata "meta1.json,meta2.json" \
   --thumbnail "thumb1.jpg,thumb2.jpg"
-
-video-publisher upload .\data\videos\112_es_vertical.mp4 .\data\videos\112_es_vertical.mp4 --platforms tiktok --metadata ".\data\videos\112_es_horizontal.json,.\data\videos\112_es_horizontal2.json" --thumbnail ".\data\videos\thumb_114_en_1.jpg,.\data\videos\thumb_114_en_2.jpg"
 ```
 
 **What happens:**

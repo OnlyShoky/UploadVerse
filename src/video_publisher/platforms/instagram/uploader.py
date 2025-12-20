@@ -569,6 +569,10 @@ class InstagramUploader(BasePlatform):
                     url="https://www.instagram.com/ (DRY RUN)"
                 )
             
+            # Add interaction pacing: Wait a bit before final post click to ensure metadata is processed
+            print("Pacing interaction: waiting 4 seconds before final Post click...")
+            self._human_delay(3, 5)
+
             # Click Post button
             print("Clicking Post...")
             try:
@@ -613,8 +617,14 @@ class InstagramUploader(BasePlatform):
                 except:
                     print("Did not detect 'Sharing' label, but proceeding to wait for success...")
 
-                # 2. Wait for success message or dialog to close
-                # Success messages: "Your post has been shared.", "Your reel has been shared.", etc.
+                # 2. Monitor for success OR error
+                # Error message: "Something went wrong. Please try again."
+                error_selectors = [
+                    "//div[@aria-label='Something went wrong']",
+                    "//*[contains(text(), 'Something went wrong')]",
+                    "//*[contains(text(), 'Algo salió mal')]"
+                ]
+                
                 success_selectors = [
                     "//*[contains(text(), 'Your post has been shared')]",
                     "//*[contains(text(), 'Your reel has been shared')]",
@@ -623,14 +633,32 @@ class InstagramUploader(BasePlatform):
                     "//div[@role='dialog' and .//text()[contains(., 'shared')]]"
                 ]
                 
-                # We wait up to 90 seconds for large videos
+                # We wait up to 120 seconds for large videos
                 import time as time_module
                 start_wait = time_module.time()
-                timeout = 90
+                timeout = 120
                 confirmed = False
+                error_detected = False
+                error_msg = ""
                 
-                print("Monitoring for success message...")
+                print("Monitoring for success or error...")
                 while time_module.time() - start_wait < timeout:
+                    # Check for errors first
+                    for selector in error_selectors:
+                        try:
+                            error_els = self.driver.find_elements(By.XPATH, selector)
+                            if error_els and any(el.is_displayed() for el in error_els):
+                                error_msg = "Instagram reported: 'Something went wrong'"
+                                print(f"❌ Error detected: {error_msg}")
+                                error_detected = True
+                                break
+                        except:
+                            pass
+                    
+                    if error_detected:
+                        break
+
+                    # Check for success
                     for selector in success_selectors:
                         try:
                             # Use short timeout inside the loop
@@ -665,6 +693,12 @@ class InstagramUploader(BasePlatform):
                 if confirmed:
                     print("✅ Upload verified successfully!")
                     self._human_delay(2, 3)
+                elif error_detected:
+                    return UploadResult(
+                        platform=Platform.INSTAGRAM,
+                        success=False,
+                        error=error_msg
+                    )
                 else:
                     print("⚠️  Warning: Could not verify upload completion via UI, but no error was thrown.")
                 

@@ -594,6 +594,14 @@ class InstagramUploader(BasePlatform):
                         continue
                 
                 if share_btn:
+                    if os.environ.get('DRY_RUN', 'false').lower() == 'true' or os.environ.get('TEST_MODE', 'false').lower() == 'true':
+                        print("[DRY RUN / TEST MODE] Skipping actual post click")
+                        return UploadResult(
+                            platform=Platform.INSTAGRAM,
+                            success=True,
+                            url="DRY RUN"
+                        )
+                    
                     # Use JS click to be safe
                     self.driver.execute_script("arguments[0].click();", share_btn)
                     print("Clicked Post button")

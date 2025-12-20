@@ -78,8 +78,13 @@ video-publisher status
 
 ## 🚀 Advanced Usage & Batching
 
-### 1. Batch Upload (Session Reuse)
-When uploading multiple videos, the tool reuses the same browser instance for **TikTok** and **Instagram**. This avoids repeated logins and significantly speeds up the process.
+### 1. Batch Upload & Retries
+When uploading multiple videos, the tool reuses the same browser instance for **TikTok** and **Instagram**.
+
+**Instagram Specifics:**
+- The uploader automatically retries up to **3 times** if a "Something went wrong" error is detected.
+- Between retries, it resets the state by navigating to the Instagram homepage.
+- **Rate Limits**: Uploads are only counted toward your daily limit if they are **successful**. Failures and `DRY_RUN` attempts do not consume your quota.
 
 ```bash
 # Upload 3 videos to TikTok in one session

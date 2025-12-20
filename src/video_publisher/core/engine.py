@@ -7,6 +7,7 @@ from ..platforms.tiktok.uploader import TikTokUploader
 from ..platforms.instagram.uploader import InstagramUploader
 from ..safety import RateLimiter, RiskDetector, EmergencyStop
 import os
+import time
 
 class VideoPublisher:
     def __init__(self, headless: bool = False):
@@ -91,14 +92,37 @@ class VideoPublisher:
             
             if platform in self.uploaders:
                 uploader = self.uploaders[platform]
-                result = uploader.upload(video_path, upload_metadata)
                 
-                if result.success:
-                    self.rate_limiter.record_upload(platform)
-                    remaining = self.rate_limiter.get_remaining(platform)
-                    print(f"✅ Upload successful! ({remaining} uploads remaining today)")
+                # Retry logic: Try up to 3 times for Instagram
+                max_attempts = 3 if platform == Platform.INSTAGRAM else 1
+                last_result = None
                 
-                results.append(result)
+                for attempt in range(1, max_attempts + 1):
+                    if attempt > 1:
+                        print(f"\n🔄 Retrying {platform.value} upload (Attempt {attempt}/{max_attempts})...")
+                        # Reset state: navigate back to home before retrying
+                        try:
+                            if hasattr(uploader, 'driver') and uploader.driver:
+                                uploader.driver.get('https://www.instagram.com' if platform == Platform.INSTAGRAM else 'https://www.tiktok.com')
+                                time.sleep(3)
+                        except:
+                            pass
+                    
+                    result = uploader.upload(video_path, upload_metadata)
+                    last_result = result
+                    
+                    if result.success:
+                        if not (os.environ.get('DRY_RUN', 'false').lower() == 'true' or os.environ.get('TEST_MODE', 'false').lower() == 'true'):
+                            self.rate_limiter.record_upload(platform)
+                        remaining = self.rate_limiter.get_remaining(platform)
+                        print(f"✅ Upload successful! ({remaining} uploads remaining today)")
+                        break
+                    else:
+                        if attempt < max_attempts:
+                            print(f"⚠️  {platform.value} attempt {attempt} failed: {result.error}. Waiting 10s before retry...")
+                            time.sleep(10)
+                
+                results.append(last_result)
             else:
                 # Platform not yet implemented
                 results.append(UploadResult(

@@ -15,17 +15,18 @@ __version__ = "0.1.0"
 # Global instance for convenience
 _publisher_instance: Optional[VideoPublisher] = None
 
-def get_publisher() -> VideoPublisher:
+def get_publisher(headless: bool = False) -> VideoPublisher:
     """Get or create the global VideoPublisher instance."""
     global _publisher_instance
     if _publisher_instance is None:
-        _publisher_instance = VideoPublisher()
+        _publisher_instance = VideoPublisher(headless=headless)
     return _publisher_instance
 
 def upload_video(
     video_path: str,
     platforms: Optional[List[str]] = None,
-    metadata: Optional[Dict] = None
+    metadata: Optional[Dict] = None,
+    headless: bool = False
 ) -> List[UploadResult]:
     """
     Upload a video to one or more platforms.
@@ -35,17 +36,18 @@ def upload_video(
         platforms: List of platform names ('youtube', 'tiktok', 'instagram').
                   If None, auto-detect based on video format.
         metadata: Optional metadata dict with keys like 'title', 'description', etc.
+        headless: Whether to run the browser in headless mode.
     
     Returns:
         List of UploadResult objects
     
     Example:
         >>> from video_publisher import upload_video
-        >>> results = upload_video('my_video.mp4', platforms=['youtube'])
+        >>> results = upload_video('my_video.mp4', platforms=['youtube'], headless=True)
         >>> for result in results:
         ...     print(f"{result.platform}: {result.url}")
     """
-    publisher = get_publisher()
+    publisher = get_publisher(headless=headless)
     
     # Convert platform strings to Platform enum if provided
     platform_enums = None

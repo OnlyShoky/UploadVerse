@@ -9,7 +9,7 @@ from ..safety import RateLimiter, RiskDetector, EmergencyStop
 import os
 
 class VideoPublisher:
-    def __init__(self):
+    def __init__(self, headless: bool = False):
         self.analyzer = VideoAnalyzer()
         self.router = PlatformRouter()
         
@@ -20,10 +20,10 @@ class VideoPublisher:
         
         # Initialize platform uploaders
         self.uploaders = {
-            Platform.YOUTUBE: YouTubeUploader(),
-            Platform.YOUTUBE_SHORTS: YouTubeUploader(),  # Same uploader, different routing
-            Platform.TIKTOK: TikTokUploader(),
-            Platform.INSTAGRAM: InstagramUploader()
+            Platform.YOUTUBE: YouTubeUploader({'headless': headless}),
+            Platform.YOUTUBE_SHORTS: YouTubeUploader({'headless': headless}),
+            Platform.TIKTOK: TikTokUploader({'headless': headless}),
+            Platform.INSTAGRAM: InstagramUploader({'headless': headless})
         }
 
     def upload(self, video_path: str, platforms: Optional[List[Platform]] = None, metadata: Optional[dict] = None) -> List[UploadResult]:

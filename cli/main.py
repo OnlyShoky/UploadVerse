@@ -52,6 +52,7 @@ def upload(
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags (Applied to ALL videos)"),
     publish_now: bool = typer.Option(False, "--publish-now", help="Publish immediately"),
     scheduled_time: Optional[str] = typer.Option(None, "--scheduled-time", help="Schedule publication time (ISO 8601)"),
+    headless: bool = typer.Option(True, "--headless/--no-headless", help="Whether to run the browser in headless mode"),
 ):
     """
     Upload one or more videos to platforms.
@@ -173,7 +174,12 @@ def upload(
                 
                 # Call upload - the singleton pattern in `get_publisher` ensures browser reuse
                 try:
-                    results = upload_video(str(video_path), platforms=platform_list, metadata=current_metadata)
+                    results = upload_video(
+                        str(video_path),
+                        platforms=platform_list,
+                        metadata=current_metadata,
+                        headless=headless
+                    )
                     progress.update(task, completed=True)
                 except Exception as e:
                     # Catch individual upload errors so we don't crash the whole batch

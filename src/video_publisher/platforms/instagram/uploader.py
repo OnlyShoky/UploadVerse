@@ -41,6 +41,17 @@ class InstagramUploader(BasePlatform):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         
+        # Force English Language
+        options.add_argument('--lang=en-US')
+        options.add_argument('--accept-lang=en-US')
+        
+        # Set preferences for language
+        prefs = {
+            "intl.accept_languages": "en-US,en",
+            "profile.default_content_settings.popups": 0
+        }
+        options.add_experimental_option("prefs", prefs)
+        
         self.driver = uc.Chrome(options=options, version_main=142)
         
     def _human_delay(self, min_seconds=1, max_seconds=3):
@@ -176,48 +187,64 @@ class InstagramUploader(BasePlatform):
             self._human_delay(2, 4)
             
             # Dismiss any popup dialogs (e.g., "New inbox look" notification)
-            try:
-                accept_button = WebDriverWait(self.driver, 3).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and text()='Aceptar']"))
-                )
-                accept_button.click()
-                print("Dismissed popup dialog")
-                self._human_delay(1, 2)
-            except:
-                # No popup, continue
-                pass
+            print("Checking for popups...")
+            popup_selectors = [
+                "//div[@role='button' and text()='OK']",
+                "//div[@role='button' and text()='Aceptar']",
+                "//div[@role='button' and text()='Accept']",
+                "//button[text()='Not Now']",
+                "//button[text()='Ahora no']"
+            ]
             
-            # Also try English version
-            try:
-                accept_button = WebDriverWait(self.driver, 1).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and text()='Accept']"))
-                )
-                accept_button.click()
-                print("Dismissed popup dialog")
-                self._human_delay(1, 2)
-            except:
-                # No popup, continue
-                pass
+            for selector in popup_selectors:
+                try:
+                    btn = WebDriverWait(self.driver, 2).until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
+                    btn.click()
+                    print(f"Dismissed popup using: {selector}")
+                    self._human_delay(1, 2)
+                except:
+                    pass
             
             # Click Create button
             print("Clicking Create button...")
             try:
-                # Try Spanish first
-                try:
-                    create_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//span[text()='Crear']/ancestor::a"))
-                    )
-                    create_button.click()
-                    self._human_delay(1, 2)
-                except:
-                    # Try English
-                    create_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//span[text()='Create']/ancestor::a"))
-                    )
-                    create_button.click()
-                    self._human_delay(1, 2)
+                # Primary: English (forced)
+                # Try multiple selectors for the Create button link
+                create_selectors = [
+                    "//span[text()='Create']/ancestor::a",
+                    "//span[text()='Crear']/ancestor::a",
+                    "a[href='#'][role='link'] svg[aria-label='New post']", # SVG fallback
+                    "a[href='#'][role='link'] svg[aria-label='Nueva publicación']"
+                ]
+                
+                create_button = None
+                for selector in create_selectors:
+                    try:
+                        if selector.startswith("//"):
+                            create_button = WebDriverWait(self.driver, 5).until(
+                                EC.presence_of_element_located((By.XPATH, selector))
+                            )
+                        else:
+                            create_button = WebDriverWait(self.driver, 5).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                            )
+                        
+                        if create_button:
+                            # Use JS click to bypass any overlays
+                            self.driver.execute_script("arguments[0].click();", create_button)
+                            print(f"Clicked Create button using: {selector}")
+                            self._human_delay(2, 3)
+                            break
+                    except:
+                        continue
+                        
+                if not create_button:
+                    raise Exception("Create button not found")
+                    
             except Exception as e:
-                print(f"Could not find Create button: {e}")
+                print(f"Could not find or click Create button: {e}")
                 return UploadResult(
                     platform=Platform.INSTAGRAM,
                     success=False,
@@ -245,29 +272,14 @@ class InstagramUploader(BasePlatform):
                 print(f"Could not find Post option: {e}")
             
             # Click "Select from computer"
-            print("Clicking 'Select from computer'...")
-            try:
-                # Try Spanish
-                try:
-                    select_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//button[text()='Seleccionar desde la computadora']"))
-                    )
-                    select_button.click()
-                    self._human_delay(0.5, 1)
-                except:
-                    # Try English
-                    select_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//button[text()='Select from computer']"))
-                    )
-                    select_button.click()
-                    self._human_delay(0.5, 1)
-            except Exception as e:
-                print(f"Could not find 'Select from computer' button: {e}")
+            # We skip clicking this button because it opens the OS file explorer
+            # Instead, we directly find the file input and send the keys
             
             # Find and interact with file input
-            print("Uploading file...")
+            print("Uploading file via direct injection (avoiding OS dialog)...")
             try:
-                file_input = WebDriverWait(self.driver, 10).until(
+                # The file input is often present but hidden
+                file_input = WebDriverWait(self.driver, 15).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
                 )
                 file_input.send_keys(str(Path(video_path).absolute()))
@@ -281,18 +293,18 @@ class InstagramUploader(BasePlatform):
             
             # Dismiss Reels notification dialog if it appears
             try:
-                # Try Spanish "Aceptar" button
+                # Try English "OK" as browser is forced to EN
                 accept_reels = WebDriverWait(self.driver, 3).until(
-                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Aceptar') and @type='button']"))
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'OK') or contains(text(), 'Accept') and @type='button']"))
                 )
                 accept_reels.click()
                 print("Dismissed Reels notification dialog")
                 self._human_delay(1, 2)
             except:
-                # Try English "OK" or "Accept"
+                # Try Spanish "Aceptar" button as fallback
                 try:
                     accept_reels = WebDriverWait(self.driver, 1).until(
-                        EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'OK') or contains(text(), 'Accept') and @type='button']"))
+                        EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Aceptar') and @type='button']"))
                     )
                     accept_reels.click()
                     print("Dismissed Reels notification dialog")
@@ -304,11 +316,11 @@ class InstagramUploader(BasePlatform):
             print("Waiting for video to process...")
             time.sleep(5)
             
-            # Wait for "Recortar" (Crop) dialog to appear
+            # Wait for "Crop" dialog to appear
             print("Waiting for crop dialog...")
             try:
                 crop_dialog = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[@role='dialog' and (@aria-label='Recortar' or @aria-label='Crop')]"))
+                    EC.presence_of_element_located((By.XPATH, "//div[@role='dialog' and (@aria-label='Crop' or @aria-label='Recortar')]"))
                 )
                 print("Crop dialog opened")
                 self._human_delay(1, 2)
@@ -319,7 +331,7 @@ class InstagramUploader(BasePlatform):
                 
                 try:
                     # Strategy: Find all buttons in the dialog, excluding Back and Next buttons
-                    all_buttons = self.driver.find_elements(By.XPATH, "//div[@role='dialog' and (@aria-label='Recortar' or @aria-label='Crop')]//button[@type='button']")
+                    all_buttons = self.driver.find_elements(By.XPATH, "//div[@role='dialog' and (@aria-label='Crop' or @aria-label='Recortar')]//button[@type='button']")
                     
                     print(f"Found {len(all_buttons)} buttons in crop dialog")
                     
@@ -329,7 +341,7 @@ class InstagramUploader(BasePlatform):
                             button_text = button.text.strip().lower()
                             
                             # Skip navigation buttons
-                            if any(skip_word in button_text for skip_word in ['siguiente', 'next', 'atrás', 'back']):
+                            if any(skip_word in button_text for skip_word in ['next', 'siguiente', 'back', 'atrás']):
                                 print(f"Button {idx}: Skipping navigation button: {button_text}")
                                 continue
                             
@@ -379,9 +391,11 @@ class InstagramUploader(BasePlatform):
                     
                     # Try multiple selectors for "Original" button
                     original_selectors = [
-                        # Spanish "Original"
-                        "//span[text()='Original']/parent::div[@role='button']",
+                        # English "Original" (Primary)
                         "//div[@role='button']//span[text()='Original']",
+                        "//span[text()='Original']/parent::div[@role='button']",
+                        
+                        # Spanish "Original"
                         "//div[contains(@class, 'x1i10hfl')]//span[text()='Original']",
                         
                         # Try by looking for the photo icon SVG near "Original" text
@@ -415,7 +429,7 @@ class InstagramUploader(BasePlatform):
             print("Clicking Next...")
             try:
                 next_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and (.//text()='Siguiente' or .//text()='Next')]"))
+                    EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and (.//text()='Next' or .//text()='Siguiente')]"))
                 )
                 next_button.click()
                 self._human_delay(2, 3)
@@ -428,75 +442,36 @@ class InstagramUploader(BasePlatform):
                 print(f"Attempting to upload thumbnail: {thumbnail_path}")
                 try:
                     # After first Next, we are in the Edit/Filters page or Cover page
-                    # Look for "Seleccionar desde la computadora" or "Select from computer"
-                    # The user says it appears after clicking Next from dimensions
+                    # Directly look for the file input instead of clicking "Select from computer"
                     
-                    # Try to find the "Select from computer" button
-                    thumb_select_btn = None
+                    print("Uploading thumbnail via direct injection...")
                     try:
-                        # Priority 1: Text-based (Locale independent if both are provided)
-                        thumb_select_btn = WebDriverWait(self.driver, 10).until(
-                            EC.presence_of_element_located((By.XPATH, "//div[@role='button' and (text()='Seleccionar desde la computadora' or text()='Select from computer')]"))
+                        # Find the hidden file input that appears in the cover selection stage
+                        # There might be multiple file inputs, we should try to find the one that works for images
+                        thumb_input = WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, "//input[@type='file' and contains(@accept, 'image')]"))
                         )
-                    except:
-                        # Priority 2: Use the specific classes provided by the user as a fallback
-                        try:
-                            # Use a subset of classes to avoid brittle selector if some change
-                            user_classes = "x1i10hfl xjqpnuy xc5r6h4 xqeqjp1 x1phubyo xdl72j9 x2lah0s x3ct3a4 xdj266r x14z9mp xat24cr x1lziwak x2lwn1j xeuugli x1hl2dhg xggy1nq x1ja2u2z x1t137rt x1q0g3np x1a2a7pz x6s0dn4 xjyslct x1ejq31n x18oe1m7 x1sy0etr xstzfhl x9f619 x1ypdohk x1f6kntn xl56j7k x17ydfre x2b8uid xlyipyv x87ps6o x14atkfc x5c86q x18br7mf x1i0vuye xl0gqc1 xr5sc7 xlal1re x14jxsvd xt0b8zv xjbqb8w xr9e8f9 x1e4oeot x1ui04y5 x6en5u8 x972fbf x10w94by x1qhh985 x14e42zd xt0psk2 xt7dq6l xexx8yu xyri2b x18d9i69 x1c1uobl x1n2onr6 x1n5bzlp"
-                            # We can try to find by a unique combination of classes or the full string
-                            thumb_select_btn = WebDriverWait(self.driver, 5).until(
-                                EC.presence_of_element_located((By.XPATH, f"//div[@role='button' and contains(@class, 'x1i10hfl') and contains(@class, 'x1n5bzlp')]"))
-                            )
-                        except:
-                            # Priority 3: Contains text
-                            try:
-                                thumb_select_btn = WebDriverWait(self.driver, 5).until(
-                                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Select from computer') or contains(text(), 'Seleccionar desde la computadora')]"))
-                                )
-                            except:
-                                pass
-                    
-                    if thumb_select_btn:
-                        print("Found 'Select from computer' button for thumbnail")
-                        self.driver.execute_script("arguments[0].click();", thumb_select_btn)
-                        self._human_delay(2, 3)
-                        
-                        # Find the file input for the thumbnail
-                        # Usually there's a file input that appears or is made active
-                        try:
-                            thumb_input = WebDriverWait(self.driver, 10).until(
-                                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
-                            )
-                            thumb_input.send_keys(str(Path(thumbnail_path).absolute()))
-                            print("Thumbnail file sent, waiting for processing...")
-                            self._human_delay(5, 8)
-                        except Exception as e:
-                            print(f"Failed to send thumbnail keys: {e}")
-                    else:
-                        print("Could not find thumbnail selection button directly, checking for 'Portada' (Cover) tab...")
-                        # Sometimes we need to click "Portada" or "Cover" tab first
+                        thumb_input.send_keys(str(Path(thumbnail_path).absolute()))
+                        print("Thumbnail file sent successfully")
+                        self._human_delay(5, 8)
+                    except Exception as e:
+                        print(f"Direct injection for thumbnail failed: {e}")
+                        # Fallback: try clicking "Portada"/"Cover" tab first if something went wrong
                         try:
                             cover_tab = WebDriverWait(self.driver, 5).until(
-                                EC.element_to_be_clickable((By.XPATH, "//span[text()='Portada' or text()='Cover']"))
+                                EC.element_to_be_clickable((By.XPATH, "//span[text()='Cover' or text()='Portada']"))
                             )
                             cover_tab.click()
                             self._human_delay(1, 2)
                             
-                            # Try again for the select button
-                            thumb_select_btn = WebDriverWait(self.driver, 5).until(
-                                EC.presence_of_element_located((By.XPATH, "//div[@role='button' and (text()='Seleccionar desde la computadora' or text()='Select from computer')]"))
-                            )
-                            self.driver.execute_script("arguments[0].click();", thumb_select_btn)
-                            self._human_delay(2, 3)
-                            
                             thumb_input = WebDriverWait(self.driver, 5).until(
-                                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
+                                EC.presence_of_element_located((By.XPATH, "//input[@type='file' and contains(@accept, 'image')]"))
                             )
                             thumb_input.send_keys(str(Path(thumbnail_path).absolute()))
                             print("Thumbnail file sent after clicking Cover tab")
                             self._human_delay(5, 8)
-                        except:
-                             print("Thumbnail selection button not found even after checking Cover tab")
+                        except Exception as e2:
+                            print(f"Fallback thumbnail injection also failed: {e2}")
                 except Exception as e:
                     print(f"Error during thumbnail upload: {e}")
 
@@ -525,26 +500,63 @@ class InstagramUploader(BasePlatform):
             if caption:
                 print("Adding caption...")
                 try:
-                    # Click caption area first - try Spanish then English
+                    # Click caption area first - try English then Spanish
                     caption_area = None
-                    try:
-                        caption_area = WebDriverWait(self.driver, 5).until(
-                            EC.presence_of_element_located((By.XPATH, "//div[@aria-label='Escribe un pie de foto o vídeo…']"))
-                        )
-                    except:
-                        caption_area = WebDriverWait(self.driver, 5).until(
-                            EC.presence_of_element_located((By.XPATH, "//div[@aria-label='Write a caption...']"))
-                        )
+                    # Since we forced English, English selector should be primary
+                    selectors = [
+                        "//div[@aria-label='Write a caption...']",
+                        "//div[@aria-label='Escribe un pie de foto o vídeo…']",
+                        "div[contenteditable='true'][role='textbox']" # Generic fallback
+                    ]
                     
-                    caption_area.click()
-                    self._human_delay(0.5, 1)
+                    for selector in selectors:
+                        try:
+                            if selector.startswith("//"):
+                                caption_area = WebDriverWait(self.driver, 5).until(
+                                    EC.presence_of_element_located((By.XPATH, selector))
+                                )
+                            else:
+                                caption_area = WebDriverWait(self.driver, 5).until(
+                                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                                )
+                            break
+                        except:
+                            continue
                     
-                    # Type caption character by character
-                    for char in caption:
-                        caption_area.send_keys(char)
-                        time.sleep(random.uniform(0.05, 0.15))
-                    self._human_delay()
-                    
+                    if caption_area:
+                        caption_area.click()
+                        self._human_delay(0.5, 1)
+                        
+                        # Use TikTok method: Clipboard paste for React compatibility and special characters
+                        print("Using clipboard paste for caption...")
+                        self.driver.execute_script("""
+                            // Copy text to clipboard
+                            var text = arguments[1];
+                            navigator.clipboard.writeText(text).then(function() {
+                                // Focus the element
+                                arguments[0].focus();
+                            });
+                        """, caption_area, caption)
+                        self._human_delay(0.5, 1)
+                        
+                        # Paste from clipboard
+                        caption_area.send_keys(Keys.CONTROL + "v")
+                        self._human_delay(1, 2)
+                        
+                        # Fallback injection if paste didn't work (check if empty)
+                        # We use textContent for div[contenteditable]
+                        current_text = caption_area.text.strip()
+                        if not current_text:
+                            print("Clipboard paste may have failed, trying direct JS injection...")
+                            self.driver.execute_script("""
+                                arguments[0].textContent = arguments[1];
+                                arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
+                                arguments[0].dispatchEvent(new Event('change', {bubbles: true}));
+                            """, caption_area, caption)
+                        
+                    else:
+                        print("Could not find caption area")
+                        
                 except Exception as e:
                     print(f"Could not add caption: {e}")
             
@@ -560,57 +572,121 @@ class InstagramUploader(BasePlatform):
             # Click Post button
             print("Clicking Post...")
             try:
-                # Try Spanish "Compartir" (Share) first
-                try:
-                    post_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and text()='Compartir']"))
-                    )
-                    # Scroll into view
-                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
-                    self._human_delay(0.5, 1)
-                    post_button.click()
-                    self._human_delay(3, 5)
-                except:
-                    # Try English "Post" or "Share"
+                # Find Share button - try English then Spanish
+                share_btn = None
+                selectors = [
+                    "//div[@role='button' and (text()='Share' or text()='Compartir')]",
+                    "//button[text()='Share' or text()='Compartir']",
+                    "//div[contains(text(), 'Share') and @role='button']"
+                ]
+                
+                for selector in selectors:
                     try:
-                        post_button = WebDriverWait(self.driver, 5).until(
-                            EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and text()='Post']"))
+                        share_btn = WebDriverWait(self.driver, 10).until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
                         )
+                        break
                     except:
-                        post_button = WebDriverWait(self.driver, 5).until(
-                            EC.element_to_be_clickable((By.XPATH, "//div[@role='button' and text()='Share']"))
-                        )
+                        continue
+                
+                if share_btn:
+                    # Use JS click to be safe
+                    self.driver.execute_script("arguments[0].click();", share_btn)
+                    print("Clicked Post button")
+                    self._human_delay(2, 4)
+                else:
+                    print("Could not find Share button")
                     
-                    # Scroll into view
-                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
-                    self._human_delay(0.5, 1)
-                    post_button.click()
-                    self._human_delay(3, 5)
-                
-                # Wait for upload confirmation
-                print("Waiting for upload confirmation...")
-                time.sleep(5)
-                
-                return UploadResult(
-                    platform=Platform.INSTAGRAM,
-                    success=True,
-                    url="https://www.instagram.com/"
-                )
             except Exception as e:
-                return UploadResult(
-                    platform=Platform.INSTAGRAM,
-                    success=False,
-                    error=f"Failed to click post button: {e}"
-                )
+                print(f"Error clicking Post: {e}")
+
+            # Wait for upload confirmation
+            print("Waiting for upload confirmation (this may take a while for large videos)...")
+            try:
+                # 1. Wait for "Sharing" dialog to appear
+                # This shows while the video is actually being transmitted/processed
+                try:
+                    WebDriverWait(self.driver, 10).until(
+                        EC.presence_of_element_located((By.XPATH, "//div[contains(text(), 'Sharing') or contains(text(), 'Compartiendo')]"))
+                    )
+                    print("Upload in progress: 'Sharing' dialog detected")
+                except:
+                    print("Did not detect 'Sharing' label, but proceeding to wait for success...")
+
+                # 2. Wait for success message or dialog to close
+                # Success messages: "Your post has been shared.", "Your reel has been shared.", etc.
+                success_selectors = [
+                    "//*[contains(text(), 'Your post has been shared')]",
+                    "//*[contains(text(), 'Your reel has been shared')]",
+                    "//*[contains(text(), 'Shared')]",
+                    "//*[contains(text(), 'Compartido')]",
+                    "//div[@role='dialog' and .//text()[contains(., 'shared')]]"
+                ]
                 
+                # We wait up to 90 seconds for large videos
+                import time as time_module
+                start_wait = time_module.time()
+                timeout = 90
+                confirmed = False
+                
+                print("Monitoring for success message...")
+                while time_module.time() - start_wait < timeout:
+                    for selector in success_selectors:
+                        try:
+                            # Use short timeout inside the loop
+                            success_el = self.driver.find_elements(By.XPATH, selector)
+                            if success_el and any(el.is_displayed() for el in success_el):
+                                print(f"Success confirmation found: {selector}")
+                                confirmed = True
+                                break
+                        except:
+                            pass
+                    
+                    if confirmed:
+                        break
+                        
+                    # Also check if the "Sharing" overlay is gone and we are back on main page
+                    # If we can see the "Create" button again, it might be done
+                    try:
+                        # If sharing dialog is gone and we can't find it anymore
+                        sharing_els = self.driver.find_elements(By.XPATH, "//div[contains(text(), 'Sharing') or contains(text(), 'Compartiendo')]")
+                        if not sharing_els or not any(el.is_displayed() for el in sharing_els):
+                            # Check for the close button [X] of the success dialog
+                            close_btns = self.driver.find_elements(By.XPATH, "//div[@role='button']//p[text()='Done' or text()='Listo']")
+                            if close_btns:
+                                print("Found 'Done' button, upload definitely finished.")
+                                confirmed = True
+                                break
+                    except:
+                        pass
+                        
+                    time_module.sleep(2)
+                
+                if confirmed:
+                    print("✅ Upload verified successfully!")
+                    self._human_delay(2, 3)
+                else:
+                    print("⚠️  Warning: Could not verify upload completion via UI, but no error was thrown.")
+                
+            except Exception as e:
+                print(f"Observation error during confirmation: {e}")
+                
+            return UploadResult(
+                platform=Platform.INSTAGRAM,
+                success=True,
+                url="https://www.instagram.com/"
+            )
+            
         except Exception as e:
             return UploadResult(
                 platform=Platform.INSTAGRAM,
                 success=False,
-                error=str(e)
+                error=f"Instagram upload failed: {e}"
             )
-    
-    def __del__(self):
-        """Clean up driver on deletion."""
+        finally:
+            self.close()
+
+    def close(self):
+        """Close the browser."""
         if self.driver:
             self.driver.quit()

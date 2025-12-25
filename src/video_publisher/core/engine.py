@@ -93,8 +93,8 @@ class VideoPublisher:
             if platform in self.uploaders:
                 uploader = self.uploaders[platform]
                 
-                # Retry logic: Try up to 3 times for Instagram
-                max_attempts = 3 if platform == Platform.INSTAGRAM else 1
+                # Retry logic: Try up to 3 times for Instagram and TikTok
+                max_attempts = 3 if platform in [Platform.INSTAGRAM, Platform.TIKTOK] else 1
                 last_result = None
                 
                 for attempt in range(1, max_attempts + 1):
@@ -103,7 +103,8 @@ class VideoPublisher:
                         # Reset state: navigate back to home before retrying
                         try:
                             if hasattr(uploader, 'driver') and uploader.driver:
-                                uploader.driver.get('https://www.instagram.com' if platform == Platform.INSTAGRAM else 'https://www.tiktok.com')
+                                home_url = 'https://www.instagram.com' if platform == Platform.INSTAGRAM else 'https://www.tiktok.com'
+                                uploader.driver.get(home_url)
                                 time.sleep(3)
                         except:
                             pass

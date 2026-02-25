@@ -51,7 +51,7 @@ class TikTokUploader(BasePlatform):
         }
         options.add_experimental_option("prefs", prefs)
         
-        self.driver = uc.Chrome(options=options, version_main=142)
+        self.driver = uc.Chrome(options=options, version_main=145)
         
     def _human_delay(self, min_seconds=1, max_seconds=3):
         """Simulate human-like delay."""
@@ -200,6 +200,12 @@ class TikTokUploader(BasePlatform):
             
             if caption:
                 try:
+                    # Remove tutorial overlays that block clicks
+                    try:
+                        self.driver.execute_script("document.querySelectorAll('.react-joyride__overlay').forEach(el => el.remove());")
+                    except:
+                        pass
+                    
                     # Try multiple selectors for caption input
                     caption_input = None
                     selectors = [
@@ -523,6 +529,12 @@ class TikTokUploader(BasePlatform):
 
             # Click post button
             try:
+                # Remove tutorial overlays that might block the post button
+                try:
+                    self.driver.execute_script("document.querySelectorAll('.react-joyride__overlay').forEach(el => el.remove());")
+                except:
+                    pass
+                    
                 # English Strict Selectors
                 post_button = None
                 

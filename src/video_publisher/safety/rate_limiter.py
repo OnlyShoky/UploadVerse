@@ -14,9 +14,9 @@ class RateLimiter:
     # Default limits (uploads per day)
     DEFAULT_LIMITS = {
         Platform.YOUTUBE: 6,      # Conservative limit for free tier
-        Platform.YOUTUBE_SHORTS: 6,
-        Platform.TIKTOK: 4,       # To avoid spam detection
-        Platform.INSTAGRAM: 4     # To avoid action blocks
+        Platform.YOUTUBE_SHORTS: 9,
+        Platform.TIKTOK: 9,       # To avoid spam detection
+        Platform.INSTAGRAM: 9     # To avoid action blocks
     }
     
     def __init__(self, storage_path: str = "data/safety/rate_limits.json"):

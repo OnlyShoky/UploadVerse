@@ -52,7 +52,7 @@ class InstagramUploader(BasePlatform):
         }
         options.add_experimental_option("prefs", prefs)
         
-        self.driver = uc.Chrome(options=options, version_main=145)
+        self.driver = uc.Chrome(options=options, version_main=147)
         
     def _human_delay(self, min_seconds=1, max_seconds=3):
         """Simulate human-like delay."""

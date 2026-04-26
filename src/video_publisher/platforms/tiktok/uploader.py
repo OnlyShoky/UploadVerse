@@ -12,6 +12,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import undetected_chromedriver as uc
 
+
 from ..base import BasePlatform
 from ...core.models import UploadResult, Platform
 
@@ -51,7 +52,7 @@ class TikTokUploader(BasePlatform):
         }
         options.add_experimental_option("prefs", prefs)
         
-        self.driver = uc.Chrome(options=options, version_main=145)
+        self.driver = uc.Chrome(options=options, version_main=147)
         
     def _human_delay(self, min_seconds=1, max_seconds=3):
         """Simulate human-like delay."""
@@ -202,7 +203,9 @@ class TikTokUploader(BasePlatform):
                 try:
                     # Remove tutorial overlays that block clicks
                     try:
-                        self.driver.execute_script("document.querySelectorAll('.react-joyride__overlay').forEach(el => el.remove());")
+                        self.driver.execute_script("""
+                            document.querySelectorAll('.react-joyride__overlay, .react-joyride__tooltip, .__floater, .tutorial-tooltip').forEach(el => el.remove());
+                        """)
                     except:
                         pass
                     
@@ -529,11 +532,24 @@ class TikTokUploader(BasePlatform):
 
             # Click post button
             try:
-                # Remove tutorial overlays that might block the post button
+                # Handle tutorial overlays that might block the post button
                 try:
-                    self.driver.execute_script("document.querySelectorAll('.react-joyride__overlay').forEach(el => el.remove());")
-                except:
-                    pass
+                    # Try to click the "Got it" / "Entendido" button first to satisfy React state
+                    try:
+                        tooltip_btn = self.driver.find_element(By.CSS_SELECTOR, ".react-joyride__tooltip button, .tutorial-tooltip button, .__floater button")
+                        if tooltip_btn.is_displayed():
+                            self.driver.execute_script("arguments[0].click();", tooltip_btn)
+                            self._human_delay(1, 2)
+                    except:
+                        pass
+
+                    # Force remove any remaining overlays
+                    self.driver.execute_script("""
+                        document.querySelectorAll('.react-joyride__overlay, .react-joyride__tooltip, .__floater, .tutorial-tooltip').forEach(el => el.remove());
+                    """)
+                    self._human_delay(1, 2)
+                except Exception as e:
+                    print(f"Warning: Failed to clear tutorial overlays: {e}")
                     
                 # English Strict Selectors
                 post_button = None

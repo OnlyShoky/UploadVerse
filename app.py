@@ -8,6 +8,9 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+import shutil
+print(shutil.which("chromedriver"))
+
 from flask import Flask, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
